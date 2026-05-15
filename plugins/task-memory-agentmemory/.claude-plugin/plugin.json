@@ -1,0 +1,10 @@
+{
+  "name": "task-memory-agentmemory",
+  "description": "Contract skills for reading and writing working memory via agentmemory MCP",
+  "version": "0.1.0",
+  "author": {
+    "name": "tttuan"
+  },
+  "license": "Apache-2.0",
+  "skills": ["./skills/"]
+}

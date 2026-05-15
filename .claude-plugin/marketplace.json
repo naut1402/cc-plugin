@@ -16,6 +16,11 @@
       "name": "task-memory",
       "description": "Task Memory",
       "source": "./plugins/task-memory"
+    },
+    {
+      "name": "task-memory-agentmemory",
+      "description": "Working Memory contract skills (agentmemory implementation)",
+      "source": "./plugins/task-memory-agentmemory"
     }
   ]
 }

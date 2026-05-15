@@ -1,21 +1,16 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "claude-plugins-official",
+  "name": "tttuan-plugins-official",
   "description": "Directory of popular Claude Code extensions including development tools, productivity plugins, and MCP integrations",
   "owner": {
-    "name": "Anthropic",
-    "email": "support@anthropic.com"
+    "name": "tttuan",
+    "email": "tuan.140296@gmail.com"
   },
   "plugins": [
     {
-      "name": "hanbai-dev",
-      "description": "Development tools for Hanbai",
-      "author": {
-        "name": "tttuan",
-        "email": "tuan.140296@gmail.com"
-      },
-      "source": "./plugins/hanbai-dev",
-      "category": "tool"
+      "name": "task-memory-serena",
+      "description": "Working Memory contract skills (Serena implementation)",
+      "source": "./plugins/task-memory-serena"
     }
   ]
 }

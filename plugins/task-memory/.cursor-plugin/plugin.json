@@ -1,0 +1,11 @@
+{
+  "name": "task-memory-plugin",
+  "description": "Claude Code plugin for Task Memory",
+  "version": "1.0.0",
+  "author": {
+    "name": "tttuan"
+  },
+  "license": "Apache-2.0",
+  "hooks": "./hooks/hooks.json",
+  "skills": "./skills/"
+}

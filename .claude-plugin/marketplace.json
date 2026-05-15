@@ -11,6 +11,11 @@
       "name": "task-memory-serena",
       "description": "Working Memory contract skills (Serena implementation)",
       "source": "./plugins/task-memory-serena"
+    },
+    {
+      "name": "task-memory",
+      "description": "Task Memory",
+      "source": "./plugins/task-memory"
     }
   ]
 }

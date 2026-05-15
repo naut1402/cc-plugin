@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "TASK_ID=$(jq -r '.prompt // \"\"' | grep -oE '[BUFbuf][0-9]{3,6}' | head -1 | tr '[:lower:]' '[:upper:]'); [ -n \"$TASK_ID\" ] && printf '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"Task ID %s detected. Before responding, invoke /prepare-context %s to load task memory and context.\"}}\n' \"$TASK_ID\" \"$TASK_ID\" || true",
+            "statusMessage": "Detecting task ID..."
+          }
+        ]
+      }
+    ]
+  }
+}

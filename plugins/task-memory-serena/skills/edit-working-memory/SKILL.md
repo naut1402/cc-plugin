@@ -53,7 +53,7 @@ Boundary của section: từ dòng heading đó đến dòng trước heading ti
 
 ### 5. Ghi memory
 
-Gọi `edit_memory(memory-key, nội_dung_mới)`.
+Gọi `write_memory(memory_name=memory-key, content=full_new_content)` với toàn bộ nội dung đã chỉnh sửa ở bước 4.
 
 ## Kết quả trả về
 

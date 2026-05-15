@@ -26,23 +26,17 @@ Nếu thiếu `memory-key` hoặc `--content`: báo lỗi và dừng.
 
 Từ `$ARGUMENTS`, xác định `memory-key`, `content`, `mode` (mặc định `replace`).
 
-### 2. Kiểm tra tồn tại
+### 2. Xây dựng nội dung mới
 
-Gọi Serena `read_memory(memory-key)`:
-- Trả về nội dung → `exists = true`, lưu lại `old_content`.
-- Lỗi not found / nội dung rỗng → `exists = false`.
-- Lỗi khác → báo lỗi và dừng.
+- `mode = replace`: `new_content = content`
+- `mode = append`: Gọi Serena `read_memory(memory_name=memory-key)` để lấy `old_content`.
+  - Nếu thành công: `new_content = old_content + "\n\n" + content`
+  - Nếu not found / rỗng: `new_content = content`
+  - Lỗi khác: báo lỗi và dừng.
 
-### 3. Xây dựng nội dung mới
+### 3. Ghi memory
 
-- `exists = false`: `new_content = content`
-- `exists = true, mode = replace`: `new_content = content`
-- `exists = true, mode = append`: `new_content = old_content + "\n\n" + content`
-
-### 4. Ghi memory
-
-- `exists = false` → `write_memory(memory-key, new_content)`
-- `exists = true` → `edit_memory(memory-key, new_content)`
+Luôn gọi `write_memory(memory_name=memory-key, content=new_content)` bất kể memory có tồn tại hay không.
 
 ## Kết quả trả về
 

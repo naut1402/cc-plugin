@@ -14,7 +14,7 @@ Sửa nội dung của một section Markdown trong working memory. Chỉ thao t
 
 `$ARGUMENTS` = `<memory-key> --section=<heading> --content=<text> [--mode=replace|append]`
 
-- `<memory-key>` (bắt buộc): Tên memory, ví dụ `task-B4488`.
+- `<memory-key>` (bắt buộc): Key có dạng `<task-id>/<doc-type>`, ví dụ `task-B4488/task-B4488`.
 - `--section=<heading>` (bắt buộc): Heading Markdown cần cập nhật, ví dụ `## Trạng thái`. Khớp chính xác (exact string).
 - `--content=<text>` (bắt buộc): Nội dung mới.
 - `--mode=replace|append` (tùy chọn, mặc định: `replace`):
@@ -25,23 +25,30 @@ Nếu thiếu `memory-key`, `--section`, hoặc `--content`: báo lỗi và dừ
 
 ## Các bước thực hiện
 
-### 1. Parse đầu vào
+### 1. Xác định project-name
+
+Lấy basename của thư mục làm việc hiện tại (current working directory) làm `project-name`.
+Ví dụ: CWD = `/Users/tttuan/projects/hanbai-product` → `project-name = hanbai-product`.
+
+### 2. Parse đầu vào
 
 Từ `$ARGUMENTS`, xác định `memory-key`, `section`, `content`, `mode` (mặc định `replace`).
 
-### 2. Đọc note hiện tại
+Tính `note-path = <project-name>/<memory-key>.md`.
 
-Gọi `read-note(filename="working-memory/<memory-key>.md", suggestSimilar=false)`:
+### 3. Đọc note hiện tại
+
+Gọi `read-note(filename="<note-path>", suggestSimilar=false)`:
 - Nếu không tìm thấy → báo lỗi `EDIT ERROR: memory not found, use write-working-memory to create` và dừng.
 - Lấy `current_content` từ kết quả.
 
-### 3. Xác định boundary của section
+### 4. Xác định boundary của section
 
 Tìm dòng khớp chính xác với `section` trong `current_content` (ví dụ: `## Trạng thái`).
 
 Boundary của section: từ dòng heading đó đến dòng trước heading tiếp theo có cùng hoặc cao hơn level, hoặc đến cuối file.
 
-### 4. Xây dựng nội dung mới
+### 5. Xây dựng nội dung mới
 
 **Section tồn tại:**
 - `mode = replace`: Thay toàn bộ nội dung bên trong section (giữ nguyên dòng heading).
@@ -51,10 +58,10 @@ Boundary của section: từ dòng heading đó đến dòng trước heading ti
 - Thêm section mới vào cuối: `\n\n<section>\n\n<content>`.
 - Ghi nhận kết quả là `section-added`.
 
-### 5. Ghi lại note
+### 6. Ghi lại note
 
 Gọi `create-note` với:
-- `filename`: `working-memory/<memory-key>.md`
+- `filename`: `<note-path>`
 - `content`: `new_content`
 - `overwrite`: `true`
 

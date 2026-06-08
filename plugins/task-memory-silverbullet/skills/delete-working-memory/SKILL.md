@@ -1,49 +1,67 @@
 ---
 name: delete-working-memory
-description: Xóa một working memory theo tên qua SilverBullet MCP. Contract skill — chỉ dùng nội bộ bởi các skill khác.
+description: Xóa toàn bộ working memory của một task (cả folder) qua SilverBullet MCP. Contract skill — chỉ dùng nội bộ bởi các skill khác.
 user-invocable: false
 ---
 
 # Delete Working Memory
 
-Xóa một working memory khỏi SilverBullet.
+Xóa toàn bộ folder working memory của một task khỏi SilverBullet (xóa tất cả documents bên trong).
 
 ## Đầu vào
 
-`$ARGUMENTS` = `<memory-key>`
+`$ARGUMENTS` = `<task-id>`
 
-- `<memory-key>` (bắt buộc): Tên memory cần xóa, ví dụ `task-B4488`.
+- `<task-id>` (bắt buộc): ID của task cần xóa, ví dụ `task-B4488`. Toàn bộ folder `<project-name>/<task-id>/` sẽ bị xóa.
 
-Nếu thiếu `memory-key`: báo lỗi và dừng.
+Nếu thiếu `task-id`: báo lỗi và dừng.
 
 ## Các bước thực hiện
 
-### 1. Parse đầu vào
+### 1. Xác định project-name
 
-Lấy `memory-key` từ `$ARGUMENTS` (token đầu tiên).
+Lấy basename của thư mục làm việc hiện tại (current working directory) làm `project-name`.
+Ví dụ: CWD = `/Users/tttuan/projects/hanbai-product` → `project-name = hanbai-product`.
 
-### 2. Xóa note
+### 2. Parse đầu vào
 
-Gọi `delete-note` với:
-- `filename`: `working-memory/<memory-key>.md`
+Lấy `task-id` từ `$ARGUMENTS` (token đầu tiên).
 
-- Nếu thành công: trả về `DELETE RESULT: deleted`.
-- Nếu note không tồn tại (tool báo lỗi not found): trả về `DELETE RESULT: not-found`.
-- Nếu lỗi khác: trả về `DELETE ERROR`.
+Tính `folder-prefix = <project-name>/<task-id>/`.
+
+### 3. Liệt kê tất cả notes trong folder
+
+Gọi `list-notes` với:
+- `namePattern`: `<project-name>/<task-id>/.*\.md` (JavaScript regex, case-insensitive)
+
+Nếu không tìm thấy note nào: trả về `DELETE RESULT: not-found`.
+
+### 4. Xóa từng note
+
+Với mỗi note tìm được, gọi `delete-note` với:
+- `filename`: tên file của note đó
+
+Ghi nhận số note xóa thành công và số lỗi.
 
 ## Kết quả trả về
 
 **Nếu xóa thành công:**
 ```
-DELETE RESULT: deleted [<memory-key>]
+DELETE RESULT: deleted [<task-id>] (<N> files removed)
 ```
 
-**Nếu memory không tồn tại:**
+**Nếu folder không tồn tại:**
 ```
-DELETE RESULT: not-found [<memory-key>]
+DELETE RESULT: not-found [<task-id>]
 ```
 
-**Nếu lỗi khác:**
+**Nếu có lỗi một phần:**
 ```
-DELETE ERROR [<memory-key>]: <mô tả lỗi>
+DELETE RESULT: partial [<task-id>] (<N> deleted, <M> errors)
+DELETE ERROR details: <danh sách file lỗi>
+```
+
+**Nếu lỗi hoàn toàn:**
+```
+DELETE ERROR [<task-id>]: <mô tả lỗi>
 ```

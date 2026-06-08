@@ -8,13 +8,13 @@ user-invocable: false
 
 Ghi toàn bộ nội dung vào một working memory qua SilverBullet. Tạo mới nếu chưa tồn tại, cập nhật nếu đã có.
 
-Mỗi memory là một SilverBullet note tại path `working-memory/<key>.md`.
+Mỗi memory là một SilverBullet note tại path `<project-name>/<memory-key>.md`, trong đó `<memory-key>` thường có dạng `task-[ID]/[doc-type]` (ví dụ `task-B4488/task-B4488`, `task-B4488/survey-QA1`).
 
 ## Đầu vào
 
 `$ARGUMENTS` = `<memory-key> --content=<text> [--mode=replace|append]`
 
-- `<memory-key>` (bắt buộc): Tên memory, ví dụ `task-B4488`, `glossary`.
+- `<memory-key>` (bắt buộc): Key có dạng `<task-id>/<doc-type>`, ví dụ `task-B4488/task-B4488`, `task-B4488/survey-QA1`.
 - `--content=<text>` (bắt buộc): Nội dung cần ghi.
 - `--mode=replace|append` (tùy chọn, mặc định: `replace`):
   - `replace`: Ghi đè toàn bộ nội dung cũ.
@@ -24,31 +24,38 @@ Nếu thiếu `memory-key` hoặc `--content`: báo lỗi và dừng.
 
 ## Các bước thực hiện
 
-### 1. Parse đầu vào
+### 1. Xác định project-name
+
+Lấy basename của thư mục làm việc hiện tại (current working directory) làm `project-name`.
+Ví dụ: CWD = `/Users/tttuan/projects/hanbai-product` → `project-name = hanbai-product`.
+
+### 2. Parse đầu vào
 
 Từ `$ARGUMENTS`, xác định `memory-key`, `content`, `mode` (mặc định `replace`).
 
-### 2. Xử lý mode append
+Tính `note-path = <project-name>/<memory-key>.md`.
+
+### 3. Xử lý mode append
 
 Nếu `mode = append`:
-- Gọi `read-note(filename="working-memory/<memory-key>.md", suggestSimilar=false)`.
+- Gọi `read-note(filename="<note-path>", suggestSimilar=false)`.
 - Nếu note tồn tại: `final_content = <old_content> + "\n\n" + content`.
 - Nếu không tồn tại: `final_content = content`.
 
 Nếu `mode = replace`:
 - `final_content = content`
 
-### 3. Ghi note
+### 4. Ghi note
 
 Gọi `create-note` với:
-- `filename`: `working-memory/<memory-key>.md`
+- `filename`: `<note-path>`
 - `content`: `final_content`
 - `overwrite`: `true`
 
-### 4. Xác định trạng thái
+### 5. Xác định trạng thái
 
-- Nếu bước 2 đọc được note cũ: trạng thái là `replaced` (hoặc `appended` nếu append mode).
-- Nếu bước 2 không tìm thấy note cũ: trạng thái là `created`.
+- Nếu bước 3 đọc được note cũ: trạng thái là `replaced` (hoặc `appended` nếu append mode).
+- Nếu bước 3 không tìm thấy note cũ: trạng thái là `created`.
 
 ## Kết quả trả về
 

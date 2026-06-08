@@ -12,23 +12,30 @@ user-invocable: false
 
 `$ARGUMENTS` = `<memory-key>`
 
-- `<memory-key>` (bắt buộc): Tên memory cần đọc, ví dụ `task-B4488`, `glossary`, `domain-import`.
+- `<memory-key>` (bắt buộc): Key có dạng `<task-id>/<doc-type>`, ví dụ `task-B4488/task-B4488`, `task-B4488/survey-QA1`, `task-B4488/detail-design`.
 
 Nếu thiếu `memory-key`: báo lỗi và dừng.
 
 ## Các bước thực hiện
 
-### 1. Parse đầu vào
+### 1. Xác định project-name
+
+Lấy basename của thư mục làm việc hiện tại (current working directory) làm `project-name`.
+Ví dụ: CWD = `/Users/tttuan/projects/hanbai-product` → `project-name = hanbai-product`.
+
+### 2. Parse đầu vào
 
 Lấy `memory-key` từ `$ARGUMENTS` (token đầu tiên).
 
-### 2. Đọc note
+Tính `note-path = <project-name>/<memory-key>.md`.
+
+### 3. Đọc note
 
 Gọi silverbullet MCP tool `read-note` với:
-- `filename`: `working-memory/<memory-key>.md`
+- `filename`: `<note-path>`
 - `suggestSimilar`: `false`
 
-### 3. Xử lý kết quả
+### 4. Xử lý kết quả
 
 - Nếu thành công: lấy toàn bộ nội dung note trả về.
 - Nếu note không tồn tại (tool báo lỗi not found): trả về `MEMORY NOT FOUND`.

@@ -23,6 +23,16 @@
       "source": "./plugins/task-memory-agentmemory"
     },
     {
+      "name": "task-memory-silverbullet",
+      "description": "Working Memory contract skills (SilverBullet implementation)",
+      "source": "./plugins/task-memory-silverbullet"
+    },
+    {
+      "name": "document-writting",
+      "description": "Claude Code plugin for Document Writting",
+      "source": "./plugins/document-writting"
+    },
+    {
       "name": "dev-agent-teams",
       "description": "Multi-agent development pipeline: investigate → design → implement → review → PR",
       "source": "./plugins/dev-agent-teams"

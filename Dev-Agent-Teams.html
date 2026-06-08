@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dev Agents Team — Sơ đồ tương tác</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --bg-card: #ffffff;
+    --text: #2c2c2a;
+    --text-muted: #5f5e5a;
+    --text-faint: #888780;
+    --border: rgba(0,0,0,0.12);
+    --border-strong: rgba(0,0,0,0.25);
+    --teal-light: #E1F5EE;
+    --teal: #1D9E75;
+    --teal-dark: #085041;
+    --gray-light: #F1EFE8;
+    --gray-mid: #D3D1C7;
+    --gray-dark: #444441;
+    --amber-light: #FAEEDA;
+    --amber: #BA7517;
+    --amber-dark: #633806;
+    --coral: #D85A30;
+    --coral-light: #FAECE7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    font-size: 14px;
+  }
+  header {
+    padding: 24px 32px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0 0 6px; font-size: 20px; font-weight: 500; }
+  header p { margin: 0; color: var(--text-muted); font-size: 13px; max-width: 900px; }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 24px;
+    padding: 24px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .info-panel { position: static !important; }
+  }
+  .diagram-card {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid var(--border);
+  }
+  .diagram-card svg { display: block; width: 100%; height: auto; }
+  .hint { text-align: center; color: var(--text-faint); font-size: 12px; margin: 12px 0 0; }
+  .info-panel {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    position: sticky;
+    top: 16px;
+    height: fit-content;
+  }
+  .info-type {
+    display: inline-block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 9px;
+    border-radius: 12px;
+    background: var(--gray-light);
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+  .info-type.agent { background: var(--teal-light); color: var(--teal-dark); }
+  .info-type.skill { background: var(--amber-light); color: var(--amber-dark); }
+  .info-type.artifact { background: var(--coral-light); color: var(--coral); }
+  .info-type.hitl { background: var(--amber-light); color: var(--amber-dark); }
+  .info-title { font-size: 17px; font-weight: 500; margin: 0 0 12px; word-break: break-all; }
+  .info-desc { font-size: 14px; margin: 0 0 4px; color: var(--text); }
+  .info-related h4 {
+    font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-faint); margin: 14px 0 6px;
+  }
+  .info-related ul { margin: 0; padding: 0; list-style: none; }
+  .info-related li { margin-bottom: 4px; }
+  .info-related a {
+    color: var(--text); text-decoration: none; cursor: pointer;
+    padding: 3px 8px; border-radius: 6px; display: inline-block;
+    font-size: 13px; background: var(--gray-light); transition: background 0.15s;
+  }
+  .info-related a:hover { background: var(--gray-mid); }
+  .reset-btn {
+    margin-top: 18px; font-size: 12px; background: none;
+    border: 1px solid var(--border-strong); color: var(--text-muted);
+    padding: 6px 14px; border-radius: 6px; cursor: pointer;
+    font-family: inherit; transition: background 0.15s;
+  }
+  .reset-btn:hover { background: var(--gray-light); }
+
+  svg .clickable { cursor: pointer; }
+  svg .clickable .box-rect { transition: fill 0.2s, stroke 0.2s, stroke-width 0.2s; }
+  svg .clickable text { transition: fill 0.2s; pointer-events: none; user-select: none; }
+  svg .clickable:hover .box-rect { stroke-width: 1.5; }
+
+  svg .container-box {
+    fill: none; stroke: var(--text-faint); stroke-width: 0.5;
+    stroke-dasharray: 4 4; pointer-events: none;
+  }
+  svg .container-label {
+    fill: var(--text); font-size: 13px; font-weight: 500;
+    pointer-events: none; user-select: none;
+  }
+  svg .note-label {
+    fill: var(--text-faint); font-size: 11px;
+    pointer-events: none; user-select: none;
+  }
+  svg .box-default { fill: var(--gray-light); stroke: var(--border-strong); stroke-width: 0.5; }
+  svg .box-default + text { fill: var(--text); }
+  svg .box-hitl { fill: var(--amber-light); stroke: var(--amber); stroke-width: 0.5; }
+  svg .box-hitl ~ text { fill: var(--amber-dark); font-weight: 500; }
+  svg .box-state { stroke-dasharray: 3 3; stroke: var(--text-muted); }
+  svg .box-agent { fill: var(--teal-light); stroke: var(--teal); stroke-width: 0.5; }
+  svg .box-agent ~ text { fill: var(--teal-dark); font-weight: 500; }
+  svg .agent-model {
+    font-size: 11px; font-weight: 400; opacity: 0.6;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  svg .hitl-sub { font-size: 10px !important; font-weight: 400 !important; opacity: 0.8; }
+
+  svg .clickable.active .box-rect { fill: var(--teal); stroke: var(--teal-dark); stroke-width: 2; }
+  svg .clickable.active text { fill: #fff; font-weight: 500; }
+  svg .clickable.connected .box-rect { fill: var(--amber-light); stroke: var(--amber); stroke-width: 1.5; }
+  svg .clickable.connected text { fill: var(--amber-dark); font-weight: 500; }
+  svg .clickable.faded { opacity: 0.32; }
+
+  svg .connector {
+    fill: none; stroke: var(--coral); stroke-width: 1.6;
+    stroke-dasharray: 5 4; stroke-linecap: round;
+    pointer-events: none; opacity: 0;
+    animation-name: dash, fadein;
+    animation-duration: 1.5s, 0.3s;
+    animation-iteration-count: infinite, 1;
+    animation-fill-mode: forwards, forwards;
+  }
+  svg .connector.call-line {
+    stroke: var(--teal); stroke-dasharray: none; stroke-width: 1.8;
+    animation-name: fadein; animation-duration: 0.3s;
+    animation-iteration-count: 1;
+  }
+  svg .seq-marker { fill: var(--teal); stroke: #fff; stroke-width: 2; pointer-events: none; opacity: 0; animation: fadein 0.3s 0.15s forwards; }
+  svg .seq-number { fill: #fff; font-size: 12px; font-weight: 600; pointer-events: none; user-select: none; opacity: 0; animation: fadein 0.3s 0.15s forwards; }
+  @keyframes dash { to { stroke-dashoffset: -18; } }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 0.85; } }
+  svg text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Dev Agents Team — sơ đồ tương tác</h1>
+  <p>Click vào <b>dev-team-orchestrator</b> để xem nó gọi 6 agent theo thứ tự (đường teal có số). Click một <b>agent</b> để xem skill/artifact nó dùng (đường cam đứt nét). Click <b>HITL-doc</b> để xem vòng lặp review tài liệu — conditional, do user opt-in tại mỗi gate. <b>Q&A</b> là inline checkpoint phát sinh bất ngờ trong 3 phase. Click lại ô đang chọn để bỏ chọn.</p>
+</header>
+
+<div class="layout">
+  <div class="diagram-card">
+    <svg viewBox="0 0 780 660" id="diagram" role="img">
+      <title>Kiến trúc Dev Agents Team — tương tác</title>
+      <desc>Sơ đồ với dev-team-orchestrator skill, 6 agents, 5 HITL checkpoints, 8 skills, 9 artifacts, 4 knowledge-base items.</desc>
+
+      <!-- Top node: dev-team-orchestrator (skill) -->
+      <g class="clickable" data-id="dev-team-orchestrator" onclick="selectItem('dev-team-orchestrator')">
+        <rect class="box-rect box-default" x="310" y="20" width="160" height="40" rx="8"/>
+        <text x="390" y="40" text-anchor="middle" dominant-baseline="central">dev-team-orchestrator</text>
+      </g>
+
+      <!-- Knowledge-base container -->
+      <rect class="container-box" x="20" y="90" width="140" height="520" rx="14"/>
+      <text class="container-label" x="30" y="108" dominant-baseline="central">Knowledge-base</text>
+
+      <g class="clickable" data-id="issue" onclick="selectItem('issue')">
+        <rect class="box-rect box-default" x="30" y="125" width="120" height="44" rx="6"/>
+        <text x="90" y="147" text-anchor="middle" dominant-baseline="central">issue</text>
+      </g>
+      <g class="clickable" data-id="doc-review-rules" onclick="selectItem('doc-review-rules')">
+        <rect class="box-rect box-default" x="30" y="185" width="120" height="44" rx="6"/>
+        <text x="90" y="207" text-anchor="middle" dominant-baseline="central">doc-review-rules</text>
+      </g>
+      <g class="clickable" data-id="conventions" onclick="selectItem('conventions')">
+        <rect class="box-rect box-default" x="30" y="245" width="120" height="44" rx="6"/>
+        <text x="90" y="267" text-anchor="middle" dominant-baseline="central">conventions</text>
+      </g>
+      <g class="clickable" data-id="knowhow" onclick="selectItem('knowhow')">
+        <rect class="box-rect box-default" x="30" y="305" width="120" height="44" rx="6"/>
+        <text x="90" y="327" text-anchor="middle" dominant-baseline="central">knowhow</text>
+      </g>
+      <text class="note-label" x="90" y="375" text-anchor="middle" dominant-baseline="central">per-task · persistent</text>
+
+      <!-- Agents container -->
+      <rect class="container-box" x="180" y="90" width="580" height="80" rx="14"/>
+      <text class="container-label" x="190" y="108" dominant-baseline="central">Agents</text>
+
+      <g class="clickable" data-id="investigator" onclick="selectItem('investigator')">
+        <rect class="box-rect box-agent" x="185" y="120" width="80" height="44" rx="6"/>
+        <text x="225" y="138" text-anchor="middle" dominant-baseline="central">investigator</text>
+        <text class="agent-model" x="225" y="156" text-anchor="middle" dominant-baseline="central">sonnet</text>
+      </g>
+      <g class="clickable" data-id="designer" onclick="selectItem('designer')">
+        <rect class="box-rect box-agent" x="283" y="120" width="80" height="44" rx="6"/>
+        <text x="323" y="138" text-anchor="middle" dominant-baseline="central">designer</text>
+        <text class="agent-model" x="323" y="156" text-anchor="middle" dominant-baseline="central">opus</text>
+      </g>
+      <g class="clickable" data-id="doc-reviewer" onclick="selectItem('doc-reviewer')">
+        <rect class="box-rect box-agent" x="381" y="120" width="80" height="44" rx="6"/>
+        <text x="421" y="135" text-anchor="middle" dominant-baseline="central">doc-reviewer</text>
+        <text class="agent-model" x="421" y="149" text-anchor="middle" dominant-baseline="central">sonnet</text>
+        <text class="agent-model" x="421" y="160" text-anchor="middle" dominant-baseline="central">* optional</text>
+      </g>
+      <g class="clickable" data-id="implementer" onclick="selectItem('implementer')">
+        <rect class="box-rect box-agent" x="479" y="120" width="80" height="44" rx="6"/>
+        <text x="519" y="138" text-anchor="middle" dominant-baseline="central">implementer</text>
+        <text class="agent-model" x="519" y="156" text-anchor="middle" dominant-baseline="central">sonnet</text>
+      </g>
+      <g class="clickable" data-id="reviewer" onclick="selectItem('reviewer')">
+        <rect class="box-rect box-agent" x="577" y="120" width="80" height="44" rx="6"/>
+        <text x="617" y="138" text-anchor="middle" dominant-baseline="central">reviewer</text>
+        <text class="agent-model" x="617" y="156" text-anchor="middle" dominant-baseline="central">opus</text>
+      </g>
+      <g class="clickable" data-id="pr-creator" onclick="selectItem('pr-creator')">
+        <rect class="box-rect box-agent" x="675" y="120" width="80" height="44" rx="6"/>
+        <text x="715" y="138" text-anchor="middle" dominant-baseline="central">pr-creator</text>
+        <text class="agent-model" x="715" y="156" text-anchor="middle" dominant-baseline="central">haiku</text>
+      </g>
+
+      <!-- HITL container -->
+      <rect class="container-box" x="180" y="190" width="580" height="62" rx="14"/>
+      <text class="container-label" x="190" y="208" dominant-baseline="central">HITL Checkpoints</text>
+
+      <g class="clickable" data-id="HITL #1" onclick="selectItem('HITL #1')">
+        <rect class="box-rect box-hitl" x="192" y="215" width="100" height="30" rx="6"/>
+        <text x="242" y="230" text-anchor="middle" dominant-baseline="central">HITL #1</text>
+      </g>
+      <g class="clickable" data-id="HITL #2" onclick="selectItem('HITL #2')">
+        <rect class="box-rect box-hitl" x="306" y="215" width="100" height="30" rx="6"/>
+        <text x="356" y="230" text-anchor="middle" dominant-baseline="central">HITL #2</text>
+      </g>
+      <g class="clickable" data-id="HITL-doc" onclick="selectItem('HITL-doc')">
+        <rect class="box-rect box-hitl" x="420" y="215" width="100" height="30" rx="6"/>
+        <text x="470" y="230" text-anchor="middle" dominant-baseline="central">HITL-doc ✦</text>
+      </g>
+      <g class="clickable" data-id="HITL #3" onclick="selectItem('HITL #3')">
+        <rect class="box-rect box-hitl" x="534" y="215" width="100" height="30" rx="6"/>
+        <text x="584" y="230" text-anchor="middle" dominant-baseline="central">HITL #3</text>
+      </g>
+      <g class="clickable" data-id="Q&amp;A HITL" onclick="selectItem('Q&amp;A HITL')">
+        <rect class="box-rect box-hitl" x="648" y="215" width="100" height="30" rx="6"/>
+        <text x="698" y="230" text-anchor="middle" dominant-baseline="central">Q&amp;A ⟳</text>
+      </g>
+
+      <!-- Skill container -->
+      <rect class="container-box" x="180" y="272" width="580" height="130" rx="14"/>
+      <text class="container-label" x="190" y="290" dominant-baseline="central">Skill</text>
+
+      <!-- Skill row 1 -->
+      <g class="clickable" data-id="dev-team-orchestrator" onclick="selectItem('dev-team-orchestrator')">
+        <rect class="box-rect box-default" x="185" y="300" width="126" height="36" rx="6"/>
+        <text x="248" y="318" text-anchor="middle" dominant-baseline="central" font-size="11">dev-team-orchestrator</text>
+      </g>
+      <g class="clickable" data-id="survey-codebase" onclick="selectItem('survey-codebase')">
+        <rect class="box-rect box-default" x="333" y="300" width="126" height="36" rx="6"/>
+        <text x="396" y="318" text-anchor="middle" dominant-baseline="central">survey-codebase</text>
+      </g>
+      <g class="clickable" data-id="write-design" onclick="selectItem('write-design')">
+        <rect class="box-rect box-default" x="481" y="300" width="126" height="36" rx="6"/>
+        <text x="544" y="318" text-anchor="middle" dominant-baseline="central">write-design</text>
+      </g>
+      <g class="clickable" data-id="doc-review" onclick="selectItem('doc-review')">
+        <rect class="box-rect box-default" x="629" y="300" width="126" height="36" rx="6"/>
+        <text x="692" y="318" text-anchor="middle" dominant-baseline="central">doc-review</text>
+      </g>
+
+      <!-- Skill row 2 -->
+      <g class="clickable" data-id="coding-rules" onclick="selectItem('coding-rules')">
+        <rect class="box-rect box-default" x="185" y="350" width="126" height="36" rx="6"/>
+        <text x="248" y="368" text-anchor="middle" dominant-baseline="central">coding-rules</text>
+      </g>
+      <g class="clickable" data-id="write-tests" onclick="selectItem('write-tests')">
+        <rect class="box-rect box-default" x="333" y="350" width="126" height="36" rx="6"/>
+        <text x="396" y="368" text-anchor="middle" dominant-baseline="central">write-tests</text>
+      </g>
+      <g class="clickable" data-id="run-phpstan" onclick="selectItem('run-phpstan')">
+        <rect class="box-rect box-default" x="481" y="350" width="126" height="36" rx="6"/>
+        <text x="544" y="368" text-anchor="middle" dominant-baseline="central">run-phpstan</text>
+      </g>
+      <g class="clickable" data-id="create-pr" onclick="selectItem('create-pr')">
+        <rect class="box-rect box-default" x="629" y="350" width="126" height="36" rx="6"/>
+        <text x="692" y="368" text-anchor="middle" dominant-baseline="central">create-pr</text>
+      </g>
+
+      <!-- Artifact container -->
+      <rect class="container-box" x="180" y="422" width="580" height="220" rx="14"/>
+      <text class="container-label" x="190" y="440" dominant-baseline="central">Artifact</text>
+
+      <!-- Artifact row 1 -->
+      <g class="clickable" data-id="investigate.md" onclick="selectItem('investigate.md')">
+        <rect class="box-rect box-default" x="185" y="452" width="126" height="36" rx="6"/>
+        <text x="248" y="470" text-anchor="middle" dominant-baseline="central">investigate.md</text>
+      </g>
+      <g class="clickable" data-id="design.md" onclick="selectItem('design.md')">
+        <rect class="box-rect box-default" x="333" y="452" width="126" height="36" rx="6"/>
+        <text x="396" y="470" text-anchor="middle" dominant-baseline="central">design.md</text>
+      </g>
+      <g class="clickable" data-id="{doc}-po.md" onclick="selectItem('{doc}-po.md')">
+        <rect class="box-rect box-default" x="481" y="452" width="126" height="36" rx="6"/>
+        <text x="544" y="470" text-anchor="middle" dominant-baseline="central">{doc}-po.md</text>
+      </g>
+      <g class="clickable" data-id="patches/" onclick="selectItem('patches/')">
+        <rect class="box-rect box-default" x="629" y="452" width="126" height="36" rx="6"/>
+        <text x="692" y="470" text-anchor="middle" dominant-baseline="central">patches/</text>
+      </g>
+
+      <!-- Artifact row 2 -->
+      <g class="clickable" data-id="phpstan.md" onclick="selectItem('phpstan.md')">
+        <rect class="box-rect box-default" x="185" y="502" width="126" height="36" rx="6"/>
+        <text x="248" y="520" text-anchor="middle" dominant-baseline="central">phpstan.md</text>
+      </g>
+      <g class="clickable" data-id="test-spec.md" onclick="selectItem('test-spec.md')">
+        <rect class="box-rect box-default" x="333" y="502" width="126" height="36" rx="6"/>
+        <text x="396" y="520" text-anchor="middle" dominant-baseline="central">test-spec.md</text>
+      </g>
+      <g class="clickable" data-id="review.md" onclick="selectItem('review.md')">
+        <rect class="box-rect box-default" x="481" y="502" width="126" height="36" rx="6"/>
+        <text x="544" y="520" text-anchor="middle" dominant-baseline="central">review.md</text>
+      </g>
+      <g class="clickable" data-id="pr-desc.md" onclick="selectItem('pr-desc.md')">
+        <rect class="box-rect box-default" x="629" y="502" width="126" height="36" rx="6"/>
+        <text x="692" y="520" text-anchor="middle" dominant-baseline="central">pr-desc.md</text>
+      </g>
+
+      <!-- State row -->
+      <text class="note-label" x="190" y="548" dominant-baseline="central">state · không phải artifact nội dung</text>
+      <g class="clickable" data-id="qa.md" onclick="selectItem('qa.md')">
+        <rect class="box-rect box-default box-state" x="334" y="556" width="126" height="36" rx="6"/>
+        <text x="397" y="574" text-anchor="middle" dominant-baseline="central">qa.md</text>
+      </g>
+      <g class="clickable" data-id=".dev-state.json" onclick="selectItem('.dev-state.json')">
+        <rect class="box-rect box-default box-state" x="480" y="556" width="126" height="36" rx="6"/>
+        <text x="543" y="574" text-anchor="middle" dominant-baseline="central">.dev-state.json</text>
+      </g>
+
+      <!-- Connectors layer -->
+      <g id="connectors"></g>
+    </svg>
+    <p class="hint">Model nhỏ dưới tên agent: sonnet / opus / haiku. ✦ = HITL-doc chỉ xuất hiện khi user opt-in tại gate sau HITL #1 hoặc #2. ⟳ = Q&A inline có thể phát sinh bất ngờ trong investigator / designer / implementer. Đường cam đứt nét = uses/writes/reads · Đường teal liền = dev-team-orchestrator gọi agent (1–6).</p>
+  </div>
+
+  <aside class="info-panel">
+    <span class="info-type" id="info-type">Hướng dẫn</span>
+    <h2 class="info-title" id="info-title">Chọn một thành phần</h2>
+    <p class="info-desc" id="info-desc">Bấm dev-team-orchestrator để xem trình tự gọi 6 agent. Bấm agent để xem skill, artifact và tương tác. Bấm HITL-doc để xem vòng lặp review tài liệu có điều kiện. Bấm Q&A để xem cơ chế inline pause.</p>
+    <div class="info-related" id="info-related"></div>
+    <button class="reset-btn" onclick="clearSelection()">Bỏ chọn</button>
+  </aside>
+</div>
+
+<script>
+const items = {
+  'dev-team-orchestrator': {
+    type: 'Skill · Orchestrator',
+    typeClass: 'skill',
+    desc: 'Skill điều phối toàn bộ pipeline. Claude Code đọc skill này và gọi tuần tự 6 agent qua Task tool. Tại gate sau HITL #1 và HITL #2, hỏi user có muốn kích hoạt doc-reviewer không. Duy trì .dev-state.json để theo dõi phase hiện tại, HITL pending, và retry counter.',
+    artifacts: ['.dev-state.json'],
+    calls: ['investigator', 'designer', 'doc-reviewer', 'implementer', 'reviewer', 'pr-creator'],
+    pipeline: {
+      role: 'Chỉ dev-team-orchestrator gọi subagent. Tại gate sau HITL #1: hỏi "review investigate.md?". Tại gate sau HITL #2: hỏi "review design.md?". Sau Q&A HITL: đọc .dev-state.json để resume đúng agent đang dở. Sau mỗi subagent, đọc artifact để kiểm tra trước khi sang bước tiếp.'
+    }
+  },
+  'investigator': {
+    type: 'Agent · bước 1',
+    typeClass: 'agent',
+    model: 'sonnet',
+    desc: 'Survey codebase, trace call chain từ entry point, xác định phạm vi ảnh hưởng và blast radius. Dùng skill survey-codebase để đọc code, DB schema, test coverage. Ghi investigate.md. Nếu phát sinh câu hỏi blocking, tạm dừng và ghi qa.md (Q&A HITL).',
+    skills: ['survey-codebase'],
+    artifacts: ['investigate.md'],
+    knowledge: ['issue', 'conventions'],
+    calledBy: ['dev-team-orchestrator'],
+    hitls: ['HITL #1', 'Q&A HITL'],
+    pipeline: {
+      step: 1,
+      after: 'HITL #1 (dev/PM duyệt scope) → orchestrator hỏi user: "review investigate.md?" → nếu yes: HITL-doc → designer'
+    }
+  },
+  'designer': {
+    type: 'Agent · bước 2',
+    typeClass: 'agent',
+    model: 'opus',
+    desc: 'Đọc investigate.md và knowhow. Viết design.md theo §1–§7: tổng quan, investigation summary, so sánh giải pháp, schedule, implementation details, test notes. Có thể được gọi lại nếu doc-reviewer tìm thấy PO.',
+    skills: ['write-design'],
+    artifacts: ['design.md'],
+    reads: ['investigate.md'],
+    knowledge: ['knowhow'],
+    calledBy: ['dev-team-orchestrator'],
+    hitls: ['HITL #2', 'Q&A HITL'],
+    pipeline: {
+      step: 2,
+      after: 'HITL #2 (dev duyệt design) → orchestrator hỏi user: "review design.md?" → nếu yes: HITL-doc → implementer'
+    }
+  },
+  'doc-reviewer': {
+    type: 'Agent · conditional *',
+    typeClass: 'agent',
+    model: 'sonnet',
+    desc: 'Review tài liệu (investigate.md hoặc design.md) theo doc-review-rules. Ghi {doc}-po.md với danh sách pointout (PO). Không cố định trong luồng — chỉ chạy khi user opt-in tại gate sau HITL #1 hoặc HITL #2.',
+    skills: ['doc-review'],
+    artifacts: ['{doc}-po.md'],
+    reads: ['investigate.md', 'design.md'],
+    knowledge: ['doc-review-rules'],
+    calledBy: ['dev-team-orchestrator'],
+    hitls: ['HITL-doc'],
+    pipeline: {
+      role: 'Conditional agent. Gọi sau HITL #1 (review survey) hoặc HITL #2 (review design) nếu user opt-in. Nếu {doc}-po.md có PO: orchestrator gọi lại agent nguồn (investigator hoặc designer) để chỉnh sửa → doc-reviewer → HITL-doc lại. Tối đa N vòng theo config.'
+    }
+  },
+  'implementer': {
+    type: 'Agent · bước 3 (2 phase)',
+    typeClass: 'agent',
+    model: 'sonnet',
+    desc: 'Agent duy nhất có 2 phase nội tại: (1) implement code patches theo design.md dùng coding-rules, (2) chạy PHPStan và ghi kết quả vào phpstan.md. Không commit — chỉ ghi patches/ và phpstan.md. Nếu phát sinh câu hỏi, tạm dừng và ghi qa.md.',
+    skills: ['coding-rules', 'run-phpstan'],
+    artifacts: ['patches/', 'phpstan.md'],
+    reads: ['design.md'],
+    calledBy: ['dev-team-orchestrator'],
+    hitls: ['Q&A HITL'],
+    pipeline: {
+      step: 3,
+      condition: '2 phase: implement patches → chạy PHPStan',
+      after: 'Orchestrator gọi reviewer'
+    }
+  },
+  'reviewer': {
+    type: 'Agent · bước 4',
+    typeClass: 'agent',
+    model: 'opus',
+    desc: 'Đọc patches/ và phpstan.md theo coding conventions. Ghi review.md với danh sách phát hiện [must/should/imo] kèm file:line và diff suggestion. Đồng thời dùng write-tests để tạo test-spec.md từ design.',
+    skills: ['write-tests'],
+    artifacts: ['review.md', 'test-spec.md'],
+    reads: ['patches/', 'phpstan.md'],
+    knowledge: ['conventions'],
+    calledBy: ['dev-team-orchestrator'],
+    hitls: ['HITL #3'],
+    pipeline: {
+      step: 4,
+      after: 'HITL #3 (human duyệt code review) → nếu must-fix: orchestrator gọi lại implementer (max 2 vòng) rồi reviewer lại → nếu approved: pr-creator'
+    }
+  },
+  'pr-creator': {
+    type: 'Agent · bước 5',
+    typeClass: 'agent',
+    model: 'haiku',
+    desc: 'Chỉ chạy sau khi HITL #3 approved. Đọc review.md và patches/ để soạn PR description và commit message chuẩn format. Ghi pr-desc.md. Không tự push hay tạo PR — orchestrator thực hiện sau.',
+    skills: ['create-pr'],
+    artifacts: ['pr-desc.md'],
+    reads: ['review.md', 'patches/'],
+    calledBy: ['dev-team-orchestrator'],
+    pipeline: {
+      step: 5,
+      condition: 'Chỉ chạy khi HITL #3 approved',
+      after: 'Orchestrator push branch và tạo PR thực trên GitHub dùng pr-desc.md'
+    }
+  },
+
+  'survey-codebase': { type: 'Skill', typeClass: 'skill', desc: 'Cách survey codebase: trace call chain từ entry point, xác định files liên quan, đọc DB schema, kiểm tra test coverage, blast radius analysis, confidence scoring.', usedBy: ['investigator'] },
+  'write-design':    { type: 'Skill', typeClass: 'skill', desc: 'Template viết design.md §1–§7: tổng quan, investigation summary, so sánh giải pháp, schedule, implementation details, test notes, schedule update.', usedBy: ['designer'] },
+  'doc-review':      { type: 'Skill', typeClass: 'skill', desc: 'Tiêu chí review tài liệu: cấu trúc bắt buộc, nội dung cần có, tính nhất quán, format chuẩn, điểm PO (pointout) phổ biến. Áp dụng cho cả survey lẫn design.', usedBy: ['doc-reviewer'] },
+  'coding-rules':    { type: 'Skill', typeClass: 'skill', desc: 'Coding conventions và quality standards: naming, SQL prepared statements, htmlspecialchars, CSRF, không sửa ngoài scope fix, PHPStan clean (0 new errors vs main).', usedBy: ['implementer'] },
+  'write-tests':     { type: 'Skill', typeClass: 'skill', desc: 'Quy ước viết test spec từ design: white-box test cases, coverage matrix, boundary values, equivalence partitioning, decision table.', usedBy: ['reviewer'] },
+  'run-phpstan':     { type: 'Skill', typeClass: 'skill', desc: 'Quy trình chạy PHPStan: config level, cách đọc kết quả, fix patterns phổ biến (nullable, undefined var, return type). Đảm bảo 0 new errors vs main branch.', usedBy: ['implementer'] },
+  'create-pr':       { type: 'Skill', typeClass: 'skill', desc: 'Convention git + PR template: branch naming (feat/fix/hotfix), commit message format, PR description (summary, test plan, checklist, link issue). Không thêm AI trailer vào commit.', usedBy: ['pr-creator'] },
+
+  'investigate.md': { type: 'Artifact', typeClass: 'artifact', desc: 'Kết quả survey: call chain trace, files liên quan, DB tables ảnh hưởng, risk assessment, blast radius, confidence score. Đầu vào của designer và doc-reviewer.', writtenBy: ['investigator'], readBy: ['designer', 'doc-reviewer'] },
+  'design.md':      { type: 'Artifact', typeClass: 'artifact', desc: 'Design document §1–§7: tổng quan, investigation summary, so sánh giải pháp, schedule, implementation details, test notes. Đầu vào của doc-reviewer và implementer.', writtenBy: ['designer'], readBy: ['doc-reviewer', 'implementer'] },
+  '{doc}-po.md':    { type: 'Artifact', typeClass: 'artifact', desc: 'Pointout document từ doc-reviewer. Tên thực tế: investigate-po.md hoặc design-po.md tùy context. Chứa danh sách PO (pointout) cần sửa — orchestrator dùng để quyết định có gọi lại agent nguồn không.', writtenBy: ['doc-reviewer'], readBy: ['dev-team-orchestrator'] },
+  'patches/':       { type: 'Artifact', typeClass: 'artifact', desc: 'Code patches: file path + line numbers + BEFORE/AFTER blocks theo chuẩn. Đầu vào của reviewer và pr-creator.', writtenBy: ['implementer'], readBy: ['reviewer', 'pr-creator'] },
+  'phpstan.md':     { type: 'Artifact', typeClass: 'artifact', desc: 'Kết quả PHPStan: danh sách errors nếu có, hoặc confirmation "0 new errors vs main" khi clean. Đầu vào của reviewer.', writtenBy: ['implementer'], readBy: ['reviewer'] },
+  'test-spec.md':   { type: 'Artifact', typeClass: 'artifact', desc: 'White-box test spec: test cases với input/expected output, coverage matrix, boundary cases từ design.', writtenBy: ['reviewer'] },
+  'review.md':      { type: 'Artifact', typeClass: 'artifact', desc: 'Kết quả code review: danh sách [must/should/imo] với file:line, diff suggestion. Đầu vào của pr-creator. Nếu có must: orchestrator gọi lại implementer.', writtenBy: ['reviewer'], readBy: ['pr-creator'] },
+  'pr-desc.md':     { type: 'Artifact', typeClass: 'artifact', desc: 'PR description draft: title, summary, test plan, checklist, link issue. Orchestrator dùng để tạo PR thực trên GitHub.', writtenBy: ['pr-creator'] },
+
+  'qa.md': {
+    type: 'State (Q&A inline)',
+    typeClass: 'artifact',
+    descHTML: 'File Q&A inline được tạo khi <b>investigator / designer / implementer</b> phát sinh câu hỏi cần xác nhận từ user:<br>· Câu hỏi blocking chưa có trong issue<br>· Ambiguity trong requirement<br>· Trade-off cần human quyết định<br><br>Orchestrator dừng pipeline, báo user đọc <code>qa.md</code> và trả lời. Sau khi user confirm, orchestrator đọc <code>.dev-state.json</code> để biết phase hiện tại và gọi lại đúng agent đó để tiếp tục.',
+    writtenBy: ['investigator', 'designer', 'implementer'],
+    readBy: ['dev-team-orchestrator']
+  },
+  '.dev-state.json': {
+    type: 'State (metadata)',
+    typeClass: 'artifact',
+    descHTML: 'File state nhẹ chỉ giữ những thứ <b>KHÔNG suy ra được</b> từ artifact nội dung:<br>· <b>current_phase</b> — agent nào đang chạy (để resume sau Q&A HITL).<br>· <b>hitl_pending</b> — checkpoint nào đang chờ duyệt.<br>· <b>review_round</b> — số vòng implementer đã được gọi lại sau HITL #3 (max 2).<br>· <b>doc_review_round</b> — số vòng doc-reviewer đã chạy cho từng tài liệu.<br><br><b>KHÔNG dùng để báo "phase X xong"</b> — status suy từ sự tồn tại + tính hợp lệ của artifact (vd có <code>design.md</code> hợp lệ = designer đã xong). Chỉ dev-team-orchestrator ghi và đọc.',
+    writtenBy: ['dev-team-orchestrator'],
+    readBy: ['dev-team-orchestrator']
+  },
+
+  'HITL #1': {
+    type: 'Human checkpoint',
+    typeClass: 'hitl',
+    descHTML: 'Sau khi <b>investigator</b> hoàn tất, orchestrator dừng pipeline. Dev/PM đọc <code>investigate.md</code>, xác nhận scope và phân tích đúng trước khi đầu tư vào design.<br><br>Sau khi approved, orchestrator hỏi: <i>"Có muốn review investigate.md qua doc-reviewer không?"</i><br>· Yes → gọi doc-reviewer → HITL-doc<br>· No → chuyển thẳng sang designer.',
+    related: ['investigator', 'investigate.md', 'doc-reviewer', 'designer', 'dev-team-orchestrator', '.dev-state.json']
+  },
+  'HITL #2': {
+    type: 'Human checkpoint',
+    typeClass: 'hitl',
+    descHTML: 'Sau khi <b>designer</b> hoàn tất, orchestrator dừng để dev duyệt <code>design.md</code> — approach đúng, edge cases đủ, test strategy rõ trước khi đầu tư vào implementation.<br><br>Sau khi approved, orchestrator hỏi: <i>"Có muốn review design.md qua doc-reviewer không?"</i><br>· Yes → gọi doc-reviewer → HITL-doc<br>· No → chuyển thẳng sang implementer.',
+    related: ['designer', 'design.md', 'doc-reviewer', 'implementer', 'dev-team-orchestrator', '.dev-state.json']
+  },
+  'HITL-doc': {
+    type: 'Human checkpoint · conditional ✦',
+    typeClass: 'hitl',
+    descHTML: 'Sau khi <b>doc-reviewer</b> hoàn tất, orchestrator dừng để user đọc <code>{doc}-po.md</code>:<br>· <b>Không có PO</b>: tài liệu đạt, tiếp tục sang agent kế tiếp trong pipeline.<br>· <b>Có PO</b>: orchestrator gọi lại agent nguồn (investigator hoặc designer) để sửa theo PO → doc-reviewer review lại → HITL-doc lần nữa.<br><br>Checkpoint <b>optional</b> — chỉ xuất hiện khi user chọn yes tại gate sau HITL #1 hoặc HITL #2.',
+    related: ['doc-reviewer', '{doc}-po.md', 'investigator', 'designer', 'dev-team-orchestrator', '.dev-state.json']
+  },
+  'HITL #3': {
+    type: 'Human checkpoint',
+    typeClass: 'hitl',
+    descHTML: 'Sau khi <b>reviewer</b> hoàn tất, orchestrator dừng để human đọc <code>review.md</code> và <code>patches/</code>. Checkpoint <b>bắt buộc</b> — tạo PR là hành động ghi ra hệ thống ngoài.<br><br>· Nếu có [must]: orchestrator gọi lại <b>implementer</b> (max 2 vòng) → reviewer lại → HITL #3 lại.<br>· Nếu approved: orchestrator gọi <b>pr-creator</b>.',
+    related: ['reviewer', 'review.md', 'patches/', 'implementer', 'pr-creator', 'dev-team-orchestrator', '.dev-state.json']
+  },
+  'Q&A HITL': {
+    type: 'Human checkpoint · inline ⟳',
+    typeClass: 'hitl',
+    descHTML: 'Checkpoint <b>inline</b> — không phải gate cố định, xảy ra bất ngờ khi agent phát sinh câu hỏi blocking trong phase investigator, designer, hoặc implementer.<br><br><b>Flow:</b><br>1. Agent ghi <code>qa.md</code> với câu hỏi cụ thể<br>2. Orchestrator dừng pipeline, thông báo user<br>3. User trả lời vào <code>qa.md</code> và confirm<br>4. Orchestrator đọc <code>.dev-state.json → current_phase</code> → gọi lại đúng agent để tiếp tục<br><br>Khác với HITL #1–#3: có thể xảy ra nhiều lần trong cùng một phase.',
+    related: ['investigator', 'designer', 'implementer', 'qa.md', 'dev-team-orchestrator', '.dev-state.json']
+  },
+
+  'issue':            { type: 'Knowledge-base · input', desc: 'Issue đầu vào (Jira, GitHub, Redmine): description, acceptance criteria, business context, priority. Per-task — thay đổi mỗi task.', readBy: ['investigator'] },
+  'doc-review-rules': { type: 'Knowledge-base · shared', desc: 'Tiêu chí review tài liệu: cấu trúc bắt buộc, nội dung cần có, format chuẩn. Persistent — dùng chung mọi task, apply cho cả investigate.md lẫn design.md.', readBy: ['doc-reviewer'] },
+  'conventions':      { type: 'Knowledge-base · shared', desc: 'Coding conventions + quality standards của project (coding-conventions.md, coding-guideline.md). Persistent — dùng chung mọi task.', readBy: ['investigator', 'reviewer'] },
+  'knowhow':          { type: 'Knowledge-base · shared', desc: 'Domain knowledge tích lũy: business rules, system quirks, tech-stack, lessons learned từ task trước. Persistent — grow theo thời gian.', readBy: ['designer'] }
+};
+
+const centers = {
+  'dev-team-orchestrator': { x: 390, y: 60 },
+  'investigator':    { x: 225, y: 142 },
+  'designer':        { x: 323, y: 142 },
+  'doc-reviewer':    { x: 421, y: 142 },
+  'implementer':     { x: 519, y: 142 },
+  'reviewer':        { x: 617, y: 142 },
+  'pr-creator':      { x: 715, y: 142 },
+  'HITL #1':         { x: 242, y: 230 },
+  'HITL #2':         { x: 356, y: 230 },
+  'HITL-doc':        { x: 470, y: 230 },
+  'HITL #3':         { x: 584, y: 230 },
+  'Q&A HITL':        { x: 698, y: 230 },
+  'survey-codebase': { x: 396, y: 318 },
+  'write-design':    { x: 544, y: 318 },
+  'doc-review':      { x: 692, y: 318 },
+  'coding-rules':    { x: 248, y: 368 },
+  'write-tests':     { x: 396, y: 368 },
+  'run-phpstan':     { x: 544, y: 368 },
+  'create-pr':       { x: 692, y: 368 },
+  'investigate.md':  { x: 248, y: 470 },
+  'design.md':       { x: 396, y: 470 },
+  '{doc}-po.md':     { x: 544, y: 470 },
+  'patches/':        { x: 692, y: 470 },
+  'phpstan.md':      { x: 248, y: 520 },
+  'test-spec.md':    { x: 396, y: 520 },
+  'review.md':       { x: 544, y: 520 },
+  'pr-desc.md':      { x: 692, y: 520 },
+  'qa.md':           { x: 397, y: 574 },
+  '.dev-state.json': { x: 543, y: 574 },
+  'issue':           { x: 90, y: 147 },
+  'doc-review-rules':{ x: 90, y: 207 },
+  'conventions':     { x: 90, y: 267 },
+  'knowhow':         { x: 90, y: 327 }
+};
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+let currentSelection = null;
+
+function selectItem(id) {
+  if (currentSelection === id) { clearSelection(); return; }
+  const item = items[id];
+  if (!item) return;
+  currentSelection = id;
+
+  const typeEl = document.getElementById('info-type');
+  typeEl.textContent = item.model ? `${item.type} · ${item.model}` : item.type;
+  typeEl.className = 'info-type ' + (item.typeClass || '');
+  document.getElementById('info-title').textContent = id;
+  const descEl = document.getElementById('info-desc');
+  if (item.descHTML) { descEl.innerHTML = item.descHTML; } else { descEl.textContent = item.desc; }
+
+  const sections = [
+    { key: 'calls',     label: 'Gọi tuần tự (theo thứ tự)', numbered: true },
+    { key: 'skills',    label: 'Dùng skill' },
+    { key: 'reads',     label: 'Đọc artifact (từ bước trước)' },
+    { key: 'artifacts', label: 'Ghi artifact' },
+    { key: 'knowledge', label: 'Đọc / ghi knowledge' },
+    { key: 'hitls',     label: 'Liên quan checkpoint' },
+    { key: 'related',   label: 'Liên quan đến' },
+    { key: 'calledBy',  label: 'Được gọi bởi' },
+    { key: 'usedBy',    label: 'Được dùng bởi' },
+    { key: 'writtenBy', label: 'Được ghi bởi' },
+    { key: 'readBy',    label: 'Được đọc bởi' }
+  ];
+  let html = '';
+  if (item.pipeline) {
+    const p = item.pipeline;
+    html += '<h4>Trình tự pipeline</h4><div style="font-size:13px;color:var(--text);margin-bottom:4px;">';
+    if (p.role) {
+      html += p.role;
+    } else {
+      const parts = [];
+      if (p.step) parts.push(`<b>Bước ${p.step}/5</b>`);
+      if (p.condition) parts.push(p.condition);
+      html += parts.join(' · ');
+      if (p.after) html += `<div style="margin-top:4px;color:var(--text-muted);">Sau bước này: ${p.after}</div>`;
+    }
+    html += '</div>';
+  }
+  for (const s of sections) {
+    const arr = item[s.key];
+    if (arr && arr.length) {
+      html += `<h4>${s.label}</h4><ul>`;
+      arr.forEach((it, idx) => {
+        const safeId = it.replace(/'/g, "\\'").replace(/&/g, '&amp;');
+        const prefix = s.numbered ? `<span style="color:var(--text-faint);margin-right:6px;">${idx+1}.</span>` : '';
+        html += `<li>${prefix}<a onclick="selectItem('${safeId}')">${it}</a></li>`;
+      });
+      html += '</ul>';
+    }
+  }
+  document.getElementById('info-related').innerHTML = html;
+  updateSVG(id, item);
+}
+
+function clearSelection() {
+  currentSelection = null;
+  const typeEl = document.getElementById('info-type');
+  typeEl.textContent = 'Hướng dẫn';
+  typeEl.className = 'info-type';
+  document.getElementById('info-title').textContent = 'Chọn một thành phần';
+  document.getElementById('info-desc').textContent = 'Bấm dev-team-orchestrator để xem trình tự gọi 6 agent. Bấm agent để xem skill, artifact và tương tác. Bấm HITL-doc để xem vòng lặp review tài liệu có điều kiện. Bấm Q&A để xem cơ chế inline pause.';
+  document.getElementById('info-related').innerHTML = '';
+  document.querySelectorAll('svg .clickable').forEach(el => el.classList.remove('active', 'connected', 'faded'));
+  document.getElementById('connectors').innerHTML = '';
+}
+
+function updateSVG(activeId, item) {
+  const connectedIds = new Set();
+  ['skills','artifacts','knowledge','usedBy','writtenBy','readBy','calls','calledBy','related','hitls','reads'].forEach(k => {
+    if (item[k]) item[k].forEach(id => connectedIds.add(id));
+  });
+  document.querySelectorAll('svg .clickable').forEach(el => {
+    const id = el.dataset.id;
+    el.classList.remove('active', 'connected', 'faded');
+    if (id === activeId) el.classList.add('active');
+    else if (connectedIds.has(id)) el.classList.add('connected');
+    else el.classList.add('faded');
+  });
+
+  const connectors = document.getElementById('connectors');
+  connectors.innerHTML = '';
+  const from = centers[activeId];
+  if (!from) return;
+
+  const drawPath = (target, klass) => {
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', curvedPath(from, target));
+    path.setAttribute('class', klass);
+    connectors.appendChild(path);
+  };
+  const drawNumberMarker = (target, num) => {
+    const mid = { x: (from.x + target.x)/2, y: (from.y + target.y)/2 };
+    const circ = document.createElementNS(SVG_NS, 'circle');
+    circ.setAttribute('cx', mid.x); circ.setAttribute('cy', mid.y); circ.setAttribute('r', 11);
+    circ.setAttribute('class', 'seq-marker');
+    connectors.appendChild(circ);
+    const txt = document.createElementNS(SVG_NS, 'text');
+    txt.setAttribute('x', mid.x); txt.setAttribute('y', mid.y);
+    txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('dominant-baseline', 'central');
+    txt.setAttribute('class', 'seq-number');
+    txt.textContent = num;
+    connectors.appendChild(txt);
+  };
+
+  const dashedKeys = ['skills','artifacts','knowledge','usedBy','writtenBy','readBy','related','hitls','reads'];
+  dashedKeys.forEach(k => {
+    if (!item[k]) return;
+    item[k].forEach(id => { const to = centers[id]; if (to) drawPath(to, 'connector'); });
+  });
+  if (item.calls) {
+    item.calls.forEach((id, idx) => {
+      const to = centers[id];
+      if (!to) return;
+      drawPath(to, 'connector call-line');
+      drawNumberMarker(to, idx + 1);
+    });
+  }
+  if (item.calledBy) {
+    item.calledBy.forEach(id => { const to = centers[id]; if (to) drawPath(to, 'connector call-line'); });
+  }
+}
+
+function curvedPath(from, to) {
+  const dy = to.y - from.y;
+  const midY = from.y + dy * 0.5;
+  return `M ${from.x} ${from.y} C ${from.x} ${midY}, ${to.x} ${midY}, ${to.x} ${to.y}`;
+}
+
+document.getElementById('diagram').addEventListener('click', (e) => {
+  if (e.target.tagName === 'svg' || e.target.classList.contains('container-box')) clearSelection();
+});
+</script>
+</body>
+</html>

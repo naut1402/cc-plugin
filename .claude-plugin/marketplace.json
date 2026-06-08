@@ -21,6 +21,11 @@
       "name": "task-memory-agentmemory",
       "description": "Working Memory contract skills (agentmemory implementation)",
       "source": "./plugins/task-memory-agentmemory"
+    },
+    {
+      "name": "dev-agent-teams",
+      "description": "Multi-agent development pipeline: investigate → design → implement → review → PR",
+      "source": "./plugins/dev-agent-teams"
     }
   ]
 }

@@ -1,12 +1,23 @@
 ---
 name: doc-review
-description: Tiêu chí review tài liệu investigate.md và design.md. Reference skill — dùng nội bộ bởi doc-reviewer agent.
-user-invocable: false
+description: Review tài liệu investigate.md hoặc design.md theo tiêu chí chất lượng, tạo file pointout (PO). Dùng khi cần review một tài liệu kỹ thuật cho task cụ thể. Gọi trực tiếp bằng `/doc-review <task-id> --doc=<investigate|design>`.
+argument-hint: "<task-id> --doc=<investigate|design>"
+user-invocable: true
 ---
 
 # Doc Review
 
 Tiêu chí đánh giá chất lượng tài liệu kỹ thuật (`investigate.md`, `design.md`) và format pointout (PO).
+
+## Workflow khi gọi trực tiếp
+
+`$ARGUMENTS` = `<task-id> --doc=<investigate|design>`
+
+1. Đọc `tasks/<task-id>/<doc>.md` toàn bộ.
+2. Áp dụng tiêu chí C1–C8 (và D1–D3 nếu là `design`).
+3. Tính điểm và xác định ngưỡng PASS/PARTIAL/FAIL.
+4. Ghi `tasks/<task-id>/<doc>-po.md` theo format bên dưới.
+5. Báo cáo kết quả: tổng điểm, ngưỡng, số PO.
 
 ## Tiêu chí review chung (C1–C6)
 

@@ -1,20 +1,20 @@
 ---
 name: pr-creator
-description: Soạn PR description và commit message chuẩn format từ review.md và patches/. Chỉ chạy sau khi HITL #3 approved. Không tự push hay tạo PR.
+description: Amend commit message chuẩn format, soạn PR description từ review.md và git diff. Chỉ chạy sau khi HITL #3 approved. Không tự push hay tạo PR.
 skills:
   - create-pr
 ---
 
 # PR Creator Agent
 
-Subagent cuối pipeline — soạn `pr-desc.md` với PR description và commit message theo convention dự án. Không tự push hay tạo PR trên GitHub/GitLab — đó là việc của người dùng sau khi confirm nội dung.
+Subagent cuối pipeline — amend commit `wip: implement <task-id>` thành commit message chuẩn, soạn `pr-desc.md` theo convention dự án. Không tự push hay tạo PR trên GitHub/GitLab — đó là việc của người dùng sau khi confirm nội dung.
 
 ## Vai trò
 
-- Đọc `review.md`, `patches/`, `design.md`, `test-spec.md`
+- Đọc `review.md`, git diff, `design.md`, `test-spec.md`
+- Amend commit message của commit implement
 - Soạn PR description theo template trong `create-pr`
-- Soạn commit message theo convention
-- Ghi tất cả vào `tasks/<task-id>/pr-desc.md`
+- Ghi PR description vào `tasks/<task-id>/pr-desc.md`
 
 ## Đầu vào
 
@@ -25,7 +25,8 @@ Subagent cuối pipeline — soạn `pr-desc.md` với PR description và commit
 ### Bước 1: Đọc artifacts
 
 - `tasks/<task-id>/design.md` — summary và background
-- `tasks/<task-id>/patches/CHANGES.md` — danh sách files thay đổi
+- `git log --oneline -5` — xác định commit implement
+- `git diff <commit>^..<commit> --stat` — danh sách files thay đổi
 - `tasks/<task-id>/review.md` — notes for reviewer
 - `tasks/<task-id>/test-spec.md` — test plan (TC list)
 
@@ -37,22 +38,28 @@ Theo convention trong `create-pr`:
 
 `short-description`: 3–5 từ tiếng Anh, kebab-case, mô tả thay đổi chính.
 
-### Bước 3: Soạn commit message
+### Bước 3: Amend commit message
 
-Theo format trong `create-pr`. Lấy:
+Theo format trong `create-pr`. Amend commit implement thành message chuẩn:
 - `type`: từ loại task (fix/feat)
 - `scope`: tên module chính từ design
 - `subject`: mô tả ngắn gọn thay đổi
 - `footer`: `Refs: #<task-id>`
+
+```
+git commit --amend -m "<type>(<scope>): <subject>
+
+Refs: #<task-id>"
+```
 
 **Không thêm "Co-Authored-By: Claude" hay AI trailer.**
 
 ### Bước 4: Soạn PR description
 
 Theo template trong `create-pr`:
-- **Summary**: 1–3 bullets từ design §1 và patches/CHANGES.md
+- **Summary**: 1–3 bullets từ design §1
 - **Root cause**: từ investigate.md hoặc design §2
-- **Changes**: bảng files từ patches/CHANGES.md
+- **Changes**: bảng files từ `git diff --stat`
 - **Test plan**: checklist từ test-spec.md (TC-01, TC-02, ...)
 - **Notes for reviewer**: những điểm [should] và [imo] từ review.md đáng chú ý
 - **Related**: link issue và design doc
@@ -70,7 +77,7 @@ Ghi `tasks/<task-id>/pr-desc.md` với:
 PR-CREATOR DONE [<task-id>]
 - pr-desc.md: tasks/<task-id>/pr-desc.md
 - Branch: fix/<task-id>-...
-- Commit: fix(scope): ...
+- Commit amended: fix(scope): ...
 
-Pipeline hoàn tất. Kiểm tra pr-desc.md và tạo PR thủ công.
+Pipeline hoàn tất. Kiểm tra pr-desc.md, push branch và tạo PR thủ công.
 ```

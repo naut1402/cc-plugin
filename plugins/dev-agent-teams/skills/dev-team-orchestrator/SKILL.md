@@ -11,11 +11,12 @@ Skill điều phối toàn bộ pipeline phát triển. Đọc skill này, Claud
 
 ## Đầu vào
 
-`$ARGUMENTS` = `<task-id> [--resume] [--subtask-of=<parent-id>]`
+`$ARGUMENTS` = `<task-id> [--resume] [--subtask-of=<parent-id>] [--auto-review]`
 
 - `<task-id>`: ID tác vụ (ví dụ `B4488`, `F003`, `U00281`). Bắt buộc.
 - `--resume`: Tiếp tục từ phase đang dở (đọc `.dev-state/<task-id>.json`).
 - `--subtask-of=<parent-id>`: Khai báo subtask — kế thừa `investigate.md` và `design.md` từ parent nếu subtask chưa có.
+- `--auto-review`: Tự động chạy doc-reviewer sau HITL #1 và #2 mà không hỏi human. Phù hợp khi muốn chạy pipeline liên tục, ít tương tác.
 
 ## Cấu trúc thư mục task
 
@@ -26,14 +27,12 @@ tasks/
     design.md
     investigate-po.md      # nếu doc-reviewer chạy cho investigate
     design-po.md           # nếu doc-reviewer chạy cho design
-    patches/               # code patches từ implementer
     phpstan.md
     review.md
     test-spec.md
     pr-desc.md
     qa.md                  # Q&A blocking questions (nếu có)
     <subtask-id>/          # workspace riêng cho subtask
-      patches/
       review.md
       ...
 ```
@@ -47,6 +46,7 @@ tasks/
   "current_phase": "investigator",
   "hitl_pending": null,
   "review_round": 0,
+  "auto_review": false,
   "doc_review_round": {
     "investigate": 0,
     "design": 0
@@ -58,6 +58,7 @@ tasks/
 - `current_phase`: agent đang chạy — dùng để resume sau Q&A HITL.
 - `hitl_pending`: checkpoint nào đang chờ duyệt (`"hitl-1"`, `"hitl-2"`, `"hitl-3"`, `"hitl-doc"`).
 - `review_round`: số vòng implementer được gọi lại sau HITL #3 (max 2).
+- `auto_review`: có tự động chạy doc-reviewer không (từ flag `--auto-review`).
 - `doc_review_round`: số vòng doc-reviewer đã chạy cho từng tài liệu.
 - `inherit_from_parent`: danh sách artifact kế thừa từ parent task (subtask only).
 
@@ -85,8 +86,8 @@ Format:
 
 1. Tạo thư mục `tasks/<task-id>/` nếu chưa có.
 2. Đọc `.dev-state/<task-id>.json`:
-   - Nếu chưa có: tạo mới với `current_phase = "investigator"`.
-   - Nếu có `--resume`: đọc `current_phase` và tiếp tục từ đó.
+   - Nếu chưa có: tạo mới với `current_phase = "investigator"`, `auto_review = (--auto-review có mặt)`.
+   - Nếu có `--resume`: đọc `current_phase` và tiếp tục từ đó. Nếu đồng thời có `--auto-review`, cập nhật `auto_review = true`.
 3. Nếu có `--subtask-of=<parent-id>`: điền `parent_task_id` và `inherit_from_parent` (thường `["investigate.md", "design.md"]`).
 
 ### Bước 1 — investigator
@@ -104,7 +105,9 @@ Agent ghi `tasks/<task-id>/investigate.md`. Nếu agent tạo `qa.md` → **Q&A 
 
 Khi investigator hoàn tất: cập nhật `hitl_pending = "hitl-1"`.
 
-Thông báo user:
+**Nếu `auto_review = true`**: tự động spawn `doc-reviewer` → **HITL-doc (investigate)**, không hỏi human.
+
+**Nếu `auto_review = false`**: thông báo user:
 ```
 ✅ Investigator xong. Vui lòng đọc tasks/<task-id>/investigate.md và xác nhận.
 Sau khi duyệt, gõ "approved" (hoặc feedback cần sửa).
@@ -128,7 +131,9 @@ Agent đọc `investigate.md` và `knowhow`, ghi `design.md`. Nếu tạo `qa.md
 
 ### HITL #2 — Duyệt design.md
 
-Tương tự HITL #1. Thông báo user đọc `design.md`, hỏi doc-review.
+**Nếu `auto_review = true`**: tự động spawn `doc-reviewer` → **HITL-doc (design)**, không hỏi human.
+
+**Nếu `auto_review = false`**: tương tự HITL #1. Thông báo user đọc `design.md`, hỏi doc-review.
 
 - approved + yes: spawn `doc-reviewer` → **HITL-doc (design)**.
 - approved + no: chuyển Bước 3.
@@ -142,7 +147,7 @@ Spawn `dev-agent-teams:implementer`:
 Task: implementer <task-id>
 ```
 
-Agent chạy 2 phase nội tại (code + phpstan), ghi `patches/` và `phpstan.md`. Nếu tạo `qa.md` → **Q&A HITL**.
+Agent chạy 2 phase nội tại (code + phpstan), commit thay đổi và ghi `phpstan.md`. Nếu tạo `qa.md` → **Q&A HITL**.
 
 ### Bước 4 — reviewer
 
@@ -159,7 +164,7 @@ Agent ghi `review.md` và `test-spec.md`.
 
 Cập nhật `hitl_pending = "hitl-3"`.
 
-Thông báo user đọc `review.md` và `patches/`. Checkpoint bắt buộc vì pr-creator tác động ra hệ thống ngoài.
+Thông báo user đọc `review.md` và `git diff` commit implement. Checkpoint bắt buộc vì pr-creator amend commit và sau đó user sẽ push.
 
 - Nếu có [must]: `review_round++` (max 2) → gọi lại implementer → reviewer → HITL #3.
 - Nếu `review_round >= 2` và vẫn còn [must]: thông báo user, dừng — cần can thiệp thủ công.

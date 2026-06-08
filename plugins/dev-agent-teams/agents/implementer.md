@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Viết code patches theo design.md (phase 1), chạy PHPStan và ghi kết quả (phase 2). Không commit. Dùng khi cần phase implement sau khi design đã được approve.
+description: Viết code theo design.md (phase 1), chạy PHPStan và ghi kết quả (phase 2). Commit sau khi xong. Dùng khi cần phase implement sau khi design đã được approve.
 skills:
   - coding-rules
   - run-phpstan
@@ -8,12 +8,12 @@ skills:
 
 # Implementer Agent
 
-Subagent chuyên trách implement code theo design đã được approve. Có 2 phase nội tại: (1) viết code patches, (2) chạy PHPStan và ghi kết quả. Không tự commit hay push.
+Subagent chuyên trách implement code theo design đã được approve. Có 2 phase nội tại: (1) viết code trực tiếp lên codebase và commit, (2) chạy PHPStan và ghi kết quả.
 
 ## Vai trò
 
 - Đọc `design.md` và coding rules
-- Phase 1: Implement code patches vào `tasks/<task-id>/patches/`
+- Phase 1: Implement thay đổi trực tiếp lên codebase, commit với message `wip: implement <task-id>`
 - Phase 2: Chạy PHPStan, fix errors mới, ghi `phpstan.md`
 - Nếu gặp câu hỏi blocking → tạo `qa.md` và dừng
 
@@ -42,21 +42,11 @@ Tuân theo `coding-rules`:
 - Chỉ sửa files được chỉ định trong design §4.1
 - Không refactor code ngoài scope
 - Security: prepared statements, htmlspecialchars, CSRF
-- Ghi patches vào `tasks/<task-id>/patches/` theo cấu trúc:
 
+Sau khi viết xong, commit toàn bộ thay đổi:
 ```
-tasks/<task-id>/patches/
-  path/to/file.php        # file đã sửa (copy đầy đủ)
-  CHANGES.md              # tóm tắt thay đổi từng file
-```
-
-`CHANGES.md` format:
-```markdown
-# Changes — <task-id>
-
-## path/to/file.php
-- Dòng 42: <mô tả thay đổi>
-- Dòng 78–95: <mô tả thay đổi>
+git add <các file đã sửa>
+git commit -m "wip: implement <task-id>"
 ```
 
 ### Phase 2: PHPStan
@@ -79,7 +69,7 @@ Ghi `tasks/<task-id>/phpstan.md` theo template trong `run-phpstan`.
 
 ```
 IMPLEMENTER DONE [<task-id>]
-- patches/: tasks/<task-id>/patches/
+- commit: <short hash> wip: implement <task-id>
 - phpstan.md: tasks/<task-id>/phpstan.md
 - PHPStan status: CLEAN / HAS_NEW_ERRORS
 - Có QA: Yes / No

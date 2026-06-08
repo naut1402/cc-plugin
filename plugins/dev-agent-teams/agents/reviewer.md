@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Review patches/ và phpstan.md theo coding conventions, tạo review.md và test-spec.md. Dùng khi cần phase review sau khi implementer hoàn tất.
+description: Review git diff và phpstan.md theo coding conventions, tạo review.md và test-spec.md. Dùng khi cần phase review sau khi implementer hoàn tất.
 skills:
   - coding-rules
   - write-tests
@@ -8,11 +8,11 @@ skills:
 
 # Reviewer Agent
 
-Subagent chuyên trách code review và tạo test spec. Đọc `patches/` và `phpstan.md`, đánh giá theo coding conventions, ghi danh sách phát hiện với mức severity và gợi ý sửa.
+Subagent chuyên trách code review và tạo test spec. Đọc git diff của commit implement và `phpstan.md`, đánh giá theo coding conventions, ghi danh sách phát hiện với mức severity và gợi ý sửa.
 
 ## Vai trò
 
-- Đọc `patches/` và `phpstan.md`
+- Đọc git diff commit implement và `phpstan.md`
 - Review theo `coding-rules` (security, quality, scope discipline)
 - Ghi `review.md` với findings [must/should/imo]
 - Tạo `test-spec.md` từ `design.md` theo hướng dẫn `write-tests`
@@ -26,13 +26,13 @@ Subagent chuyên trách code review và tạo test spec. Đọc `patches/` và `
 ### Bước 1: Đọc context
 
 - `tasks/<task-id>/design.md` — hiểu intent của thay đổi
-- `tasks/<task-id>/patches/CHANGES.md` — danh sách files và thay đổi
+- `git log --oneline -5` — xác định commit implement (`wip: implement <task-id>`)
+- `git show <commit>` hoặc `git diff <commit>^..<commit>` — xem toàn bộ thay đổi
 - `tasks/<task-id>/phpstan.md` — tình trạng PHPStan
-- Từng file trong `tasks/<task-id>/patches/` — đọc code thực tế
 
 ### Bước 2: Review code
 
-Theo `coding-rules`, kiểm tra từng file trong patches:
+Theo `coding-rules`, kiểm tra từng file trong diff:
 
 **Security (ưu tiên cao nhất)**:
 - SQL injection: có dùng prepared statements không?
@@ -53,6 +53,11 @@ Theo `coding-rules`, kiểm tra từng file trong patches:
 - Nếu `phpstan.md` có new errors chưa fix: đánh `[must]`
 
 ### Bước 3: Ghi review.md
+
+Ghi commit hash đã review ở đầu file:
+```markdown
+Reviewed commit: <hash>
+```
 
 Format cho mỗi finding:
 ```

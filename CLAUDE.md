@@ -51,12 +51,14 @@ Plugins that need an MCP server include a `.mcp.json` at plugin root:
   "mcpServers": {
     "server-name": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "${user_config.mcp_url}", "--transport", "http-only",
-               "--header", "Authorization:Bearer ${user_config.mcp_token}"]
+      "args": ["-y", "mcp-remote", "${PLUGIN_MCP_URL}", "--transport", "http-only",
+               "--header", "Authorization:Bearer ${PLUGIN_MCP_TOKEN}"]
     }
   }
 }
 ```
+
+Use `${ENV_VAR}` references for runtime values — Claude Code expands these from the process environment. Users set the vars in their shell or under `env` in Claude Code `settings.json`. The `userConfig` fields in `plugin.json` serve as documentation of required config; add `"env": "VAR_NAME"` to link them to the corresponding env var.
 
 ### SKILL.md frontmatter
 

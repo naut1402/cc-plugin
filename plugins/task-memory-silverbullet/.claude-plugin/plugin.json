@@ -11,16 +11,18 @@
     "mcp_url": {
       "type": "string",
       "title": "SilverBullet MCP URL",
-      "description": "URL of the silverbullet-mcp server, e.g. http://localhost:4000/mcp",
+      "description": "URL of the silverbullet-mcp server. Also set as env var SILVERBULLET_MCP_URL.",
       "default": "http://localhost:4000/mcp",
-      "required": true
+      "required": true,
+      "env": "SILVERBULLET_MCP_URL"
     },
     "mcp_token": {
       "type": "string",
       "title": "MCP Auth Token",
-      "description": "Bearer token to authenticate with silverbullet-mcp (MCP_SERVER_TOKEN)",
+      "description": "Bearer token (MCP_SERVER_TOKEN from silverbullet-mcp). Also set as env var SILVERBULLET_MCP_TOKEN.",
       "sensitive": true,
-      "required": true
+      "required": true,
+      "env": "SILVERBULLET_MCP_TOKEN"
     }
   }
 }

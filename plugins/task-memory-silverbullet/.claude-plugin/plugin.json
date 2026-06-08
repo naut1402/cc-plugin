@@ -1,0 +1,26 @@
+{
+  "name": "task-memory-silverbullet",
+  "description": "Contract skills for reading and writing working memory via SilverBullet MCP",
+  "version": "0.1.0",
+  "author": {
+    "name": "tttuan"
+  },
+  "license": "Apache-2.0",
+  "skills": ["./skills/"],
+  "userConfig": {
+    "mcp_url": {
+      "type": "string",
+      "title": "SilverBullet MCP URL",
+      "description": "URL of the silverbullet-mcp server, e.g. http://localhost:4000/mcp",
+      "default": "http://localhost:4000/mcp",
+      "required": true
+    },
+    "mcp_token": {
+      "type": "string",
+      "title": "MCP Auth Token",
+      "description": "Bearer token to authenticate with silverbullet-mcp (MCP_SERVER_TOKEN)",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

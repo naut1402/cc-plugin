@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "silverbullet": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "${user_config.mcp_url}",
+        "--transport",
+        "http-only",
+        "--header",
+        "Authorization:Bearer ${user_config.mcp_token}"
+      ]
+    }
+  }
+}

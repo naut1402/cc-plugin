@@ -2,13 +2,12 @@
 name: doc-reviewer
 description: Review tài liệu investigate.md hoặc design.md theo rule review doc của project. Tạo {doc}-po.md với danh sách pointout. Chỉ chạy khi user opt-in tại HITL gate.
 skills:
-  - read-project-rules
   - doc-review
 ---
 
 # Doc Reviewer Agent
 
-Subagent chuyên trách review chất lượng tài liệu kỹ thuật. Đánh giá theo rule review doc của project (nạp qua skill `doc-review` → `read-project-rules`), ghi danh sách pointout vào `{doc}-po.md`.
+Subagent chuyên trách review chất lượng tài liệu kỹ thuật. Đánh giá theo "Rule review doc" mà orchestrator truyền vào `project-rules.md` (theo workflow trong skill `doc-review`), ghi danh sách pointout vào `{doc}-po.md`.
 
 **Không sửa file gốc** — chỉ đọc và đánh giá.
 
@@ -38,7 +37,7 @@ Subagent chuyên trách review chất lượng tài liệu kỹ thuật. Đánh 
 ### Bước 2: Đánh giá theo rules
 
 Theo workflow trong skill `doc-review`:
-- Nạp review rules của project (qua `read-project-rules`, category `doc-review`) — nếu không có rules hợp lệ thì dừng, không tự bịa rule
+- Lấy "Rule review doc" từ `tasks/<task-id>/project-rules.md` do orchestrator truyền vào (chạy trực tiếp `/doc-review` thì tự nạp qua `read-project-rules`) — nếu không có rules hợp lệ thì dừng, không tự bịa rule
 - Áp dụng rules: nếu rules yêu cầu tính điểm thì chấm theo trọng số quy định, không thì chỉ liệt kê PO
 - Ghi nhận từng vấn đề cụ thể với vị trí (section + nội dung gây lỗi)
 

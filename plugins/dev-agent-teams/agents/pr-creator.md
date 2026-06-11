@@ -2,7 +2,6 @@
 name: pr-creator
 description: Amend commit message chuẩn format, soạn PR description từ review.md và git diff. Chỉ chạy sau khi HITL #3 approved. Không tự push hay tạo PR.
 skills:
-  - read-project-rules
   - create-pr
 ---
 
@@ -33,9 +32,9 @@ Subagent cuối pipeline — amend commit `wip: implement <task-id>` thành comm
 
 ### Bước 2: Soạn branch name
 
-Nạp convention git/PR của project qua skill `read-project-rules` (category `git-pr`) — rule project ưu tiên hơn convention trong `create-pr` ở các bước 2–4.
+Đọc "Rule git/PR" trong `tasks/<task-id>/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn ở các bước 2–4; nếu phần git-pr trống thì dùng `create-pr` làm fallback.
 
-Theo convention trong `create-pr`:
+Theo convention git/PR (project rule ưu tiên, `create-pr` fallback):
 - `fix/<task-id>-<short-description>` cho bug fix
 - `feat/<task-id>-<short-description>` cho feature
 

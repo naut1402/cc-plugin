@@ -8,9 +8,15 @@ user-invocable: false
 
 Template và hướng dẫn viết tài liệu thiết kế `design.md` theo chuẩn dự án.
 
-## Nạp rule từ project trước
+## Format từ project rule (bắt buộc)
 
-Trước khi viết, nạp rule của project qua skill `read-project-rules` với category `doc-writing`. Nếu project có định nghĩa rule viết tài liệu riêng (cấu trúc section, văn phong, ngôn ngữ...), rule đó **ưu tiên hơn** template bên dưới — template này chỉ là fallback khi project chưa định nghĩa.
+Format của `design.md` **phải** lấy từ "Rule viết tài liệu" (doc-writing) mà orchestrator đã nạp và truyền vào `tasks/<task-id>/project-rules.md`. Đọc phần đó và tuân theo cấu trúc section, văn phong, ngôn ngữ quy định ở đó.
+
+**Nếu phần doc-writing trống / không có rule**: dừng xử lý, báo orchestrator — **không** dùng template bên dưới làm fallback. (Orchestrator đã validate doc-writing ở đầu pipeline nên trường hợp này hiếm.)
+
+Template §1–§7 bên dưới chỉ là **ví dụ tham khảo cấu trúc**, không phải format chuẩn để áp dụng khi thiếu rule.
+
+> Khi chạy độc lập không qua orchestrator: tự nạp doc-writing rule qua skill `read-project-rules` trước; vẫn áp dụng quy tắc bắt buộc ở trên.
 
 ## Cấu trúc `design.md`
 

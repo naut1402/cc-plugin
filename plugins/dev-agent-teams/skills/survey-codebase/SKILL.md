@@ -8,9 +8,15 @@ user-invocable: false
 
 Hướng dẫn cách đọc và phân tích codebase 楽楽販売 (hanbai-product) để tạo `investigate.md`.
 
-## Nạp rule từ project trước
+## Format từ project rule (bắt buộc)
 
-Trước khi ghi `investigate.md`, nạp rule của project qua skill `read-project-rules` với category `doc-writing`. Nếu project có định nghĩa rule viết tài liệu riêng, rule đó **ưu tiên hơn** format bên dưới — format này chỉ là fallback khi project chưa định nghĩa.
+Format của `investigate.md` **phải** lấy từ "Rule viết tài liệu" (doc-writing) mà orchestrator đã nạp và truyền vào `tasks/<task-id>/project-rules.md`. Đọc phần đó và tuân theo cấu trúc, văn phong, ngôn ngữ quy định.
+
+**Nếu phần doc-writing trống / không có rule**: dừng xử lý, báo orchestrator — **không** dùng format mẫu bên dưới làm fallback.
+
+Format `investigate.md` bên dưới chỉ là **ví dụ tham khảo cấu trúc**.
+
+> Khi chạy độc lập không qua orchestrator: tự nạp doc-writing rule qua skill `read-project-rules` trước; vẫn áp dụng quy tắc bắt buộc ở trên.
 
 ## Mục tiêu
 

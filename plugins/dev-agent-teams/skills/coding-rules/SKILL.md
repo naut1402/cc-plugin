@@ -8,9 +8,9 @@ user-invocable: false
 
 Quy tắc viết code và tiêu chuẩn chất lượng cho dự án 楽楽販売 (PHP).
 
-## Nạp rule từ project trước
+## Rule từ project (ưu tiên)
 
-Trước khi áp dụng rule trong skill này, nạp rule của project qua skill `read-project-rules` với category `coding`. Nếu project có định nghĩa rule coding riêng, rule đó **ưu tiên hơn** khi xung đột — skill này chỉ là fallback/bổ sung khi project chưa định nghĩa.
+Orchestrator đã nạp rule project và truyền "Rule coding" vào `tasks/<task-id>/project-rules.md`. Đọc phần đó trước: nếu có, rule project **ưu tiên hơn** khi xung đột với skill này. Nếu phần coding trống, dùng rule trong skill này làm fallback. (Không tự gọi `read-project-rules` khi chạy trong pipeline.)
 
 ## Nguyên tắc cốt lõi
 

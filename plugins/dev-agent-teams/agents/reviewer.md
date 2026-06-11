@@ -2,7 +2,6 @@
 name: reviewer
 description: Review git diff và phpstan.md theo coding conventions, tạo review.md và test-spec.md. Dùng khi cần phase review sau khi implementer hoàn tất.
 skills:
-  - read-project-rules
   - coding-rules
   - write-tests
 ---
@@ -33,9 +32,9 @@ Subagent chuyên trách code review và tạo test spec. Đọc git diff của c
 
 ### Bước 2: Review code
 
-Nạp rule coding và rule test của project qua skill `read-project-rules` (category `coding test`) — rule project ưu tiên hơn khi xung đột với `coding-rules`/`write-tests`.
+Đọc "Rule coding" và "Rule test" trong `tasks/<task-id>/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn khi xung đột; phần nào trống thì dùng `coding-rules`/`write-tests` làm fallback.
 
-Theo `coding-rules`, kiểm tra từng file trong diff:
+Theo rule coding (project rule ưu tiên, `coding-rules` fallback), kiểm tra từng file trong diff:
 
 **Security (ưu tiên cao nhất)**:
 - SQL injection: có dùng prepared statements không?

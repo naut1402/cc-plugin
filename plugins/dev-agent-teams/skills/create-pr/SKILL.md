@@ -8,9 +8,9 @@ user-invocable: false
 
 Quy ước tạo branch, commit, và PR description cho dự án 楽楽販売.
 
-## Nạp rule từ project trước
+## Rule từ project (ưu tiên)
 
-Trước khi tạo branch/commit/PR description, nạp rule của project qua skill `read-project-rules` với category `git-pr`. Nếu project có định nghĩa convention git/PR riêng, rule đó **ưu tiên hơn** — convention bên dưới chỉ là fallback khi project chưa định nghĩa.
+Orchestrator đã truyền "Rule git/PR" vào `tasks/<task-id>/project-rules.md`. Đọc phần đó trước: nếu có, convention project **ưu tiên hơn**. Nếu phần git-pr trống, dùng convention trong skill này làm fallback.
 
 ## Branch naming
 

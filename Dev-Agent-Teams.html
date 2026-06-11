@@ -311,7 +311,7 @@
         <rect class="box-rect box-default" x="185" y="400" width="126" height="36" rx="6"/>
         <text x="248" y="418" text-anchor="middle" dominant-baseline="central" font-size="11">read-project-rules</text>
       </g>
-      <text class="note-label" x="325" y="418" dominant-baseline="central">← mọi agent nạp rule project qua đây trước (override template)</text>
+      <text class="note-label" x="325" y="418" dominant-baseline="central">← orchestrator gọi 1 lần → project-rules.md → truyền rule cho agent</text>
 
       <!-- Artifact container -->
       <rect class="container-box" x="180" y="472" width="580" height="220" rx="14"/>
@@ -384,7 +384,8 @@ const items = {
   'dev-team-orchestrator': {
     type: 'Skill · Orchestrator',
     typeClass: 'skill',
-    desc: 'Skill điều phối toàn bộ pipeline. Claude Code đọc skill này và gọi tuần tự 6 agent qua Task tool. Tại gate sau HITL #1 và HITL #2, hỏi user có muốn kích hoạt doc-reviewer không. Duy trì .dev-state.json để theo dõi phase hiện tại, HITL pending, và retry counter.',
+    desc: 'Skill điều phối toàn bộ pipeline. Claude Code đọc skill này và gọi tuần tự 6 agent qua Task tool. Ở đầu pipeline, gọi read-project-rules MỘT LẦN (mọi category), ghi project-rules.md, rồi truyền phần rule tương ứng cho từng agent — agent không tự gọi read-project-rules. Validate bắt buộc: thiếu doc-writing rule thì dừng ngay. Tại gate sau HITL #1 và HITL #2, hỏi user có muốn kích hoạt doc-reviewer không. Duy trì .dev-state.json để theo dõi phase hiện tại, HITL pending, và retry counter.',
+    skills: ['read-project-rules'],
     artifacts: ['.dev-state.json'],
     calls: ['investigator', 'designer', 'doc-reviewer', 'implementer', 'reviewer', 'pr-creator'],
     pipeline: {
@@ -396,7 +397,7 @@ const items = {
     typeClass: 'agent',
     model: 'sonnet',
     desc: 'Survey codebase, trace call chain từ entry point, xác định phạm vi ảnh hưởng và blast radius. Dùng skill survey-codebase để đọc code, DB schema, test coverage. Ghi investigate.md. Nếu phát sinh câu hỏi blocking, tạm dừng và ghi qa.md (Q&A HITL).',
-    skills: ['read-project-rules', 'survey-codebase'],
+    skills: ['survey-codebase'],
     artifacts: ['investigate.md'],
     knowledge: ['issue', 'conventions'],
     calledBy: ['dev-team-orchestrator'],
@@ -411,7 +412,7 @@ const items = {
     typeClass: 'agent',
     model: 'opus',
     desc: 'Đọc investigate.md và knowhow. Viết design.md theo §1–§7: tổng quan, investigation summary, so sánh giải pháp, schedule, implementation details, test notes. Có thể được gọi lại nếu doc-reviewer tìm thấy PO.',
-    skills: ['read-project-rules', 'write-design'],
+    skills: ['write-design'],
     artifacts: ['design.md'],
     reads: ['investigate.md'],
     knowledge: ['knowhow'],
@@ -427,7 +428,7 @@ const items = {
     typeClass: 'agent',
     model: 'sonnet',
     desc: 'Review tài liệu (investigate.md hoặc design.md) theo doc-review-rules. Ghi {doc}-po.md với danh sách pointout (PO). Không cố định trong luồng — chỉ chạy khi user opt-in tại gate sau HITL #1 hoặc HITL #2.',
-    skills: ['read-project-rules', 'doc-review'],
+    skills: ['doc-review'],
     artifacts: ['{doc}-po.md'],
     reads: ['investigate.md', 'design.md'],
     knowledge: ['doc-review-rules'],
@@ -442,7 +443,7 @@ const items = {
     typeClass: 'agent',
     model: 'sonnet',
     desc: 'Agent duy nhất có 2 phase nội tại: (1) implement code patches theo design.md dùng coding-rules, (2) chạy PHPStan và ghi kết quả vào phpstan.md. Không commit — chỉ ghi patches/ và phpstan.md. Nếu phát sinh câu hỏi, tạm dừng và ghi qa.md.',
-    skills: ['read-project-rules', 'coding-rules', 'run-phpstan'],
+    skills: ['coding-rules', 'run-phpstan'],
     artifacts: ['patches/', 'phpstan.md'],
     reads: ['design.md'],
     calledBy: ['dev-team-orchestrator'],
@@ -458,7 +459,7 @@ const items = {
     typeClass: 'agent',
     model: 'opus',
     desc: 'Đọc patches/ và phpstan.md theo coding conventions. Ghi review.md với danh sách phát hiện [must/should/imo] kèm file:line và diff suggestion. Đồng thời dùng write-tests để tạo test-spec.md từ design.',
-    skills: ['read-project-rules', 'write-tests'],
+    skills: ['write-tests'],
     artifacts: ['review.md', 'test-spec.md'],
     reads: ['patches/', 'phpstan.md'],
     knowledge: ['conventions'],
@@ -474,7 +475,7 @@ const items = {
     typeClass: 'agent',
     model: 'haiku',
     desc: 'Chỉ chạy sau khi HITL #3 approved. Đọc review.md và patches/ để soạn PR description và commit message chuẩn format. Ghi pr-desc.md. Không tự push hay tạo PR — orchestrator thực hiện sau.',
-    skills: ['read-project-rules', 'create-pr'],
+    skills: ['create-pr'],
     artifacts: ['pr-desc.md'],
     reads: ['review.md', 'patches/'],
     calledBy: ['dev-team-orchestrator'],
@@ -492,7 +493,7 @@ const items = {
   'write-tests':     { type: 'Skill', typeClass: 'skill', desc: 'Quy ước viết test spec từ design: white-box test cases, coverage matrix, boundary values, equivalence partitioning, decision table.', usedBy: ['reviewer'] },
   'run-phpstan':     { type: 'Skill', typeClass: 'skill', desc: 'Quy trình chạy PHPStan: config level, cách đọc kết quả, fix patterns phổ biến (nullable, undefined var, return type). Đảm bảo 0 new errors vs main branch.', usedBy: ['implementer'] },
   'create-pr':       { type: 'Skill', typeClass: 'skill', desc: 'Convention git + PR template: branch naming (feat/fix/hotfix), commit message format, PR description (summary, test plan, checklist, link issue). Không thêm AI trailer vào commit.', usedBy: ['pr-creator'] },
-  'read-project-rules': { type: 'Skill · shared', typeClass: 'skill', desc: 'Single source of truth cho thứ tự và cách tìm convention rule của project (coding, doc-writing, doc-review, test, git-pr). Mọi agent nạp rule project qua skill này TRƯỚC; rule tìm được ưu tiên hơn template hardcode trong các reference skill (coding-rules, write-design, write-tests, create-pr). Tìm theo thứ tự: AGENTS.md/CLAUDE.md → .claude/rules/ hoặc .cursor/rules/. Không bịa rule khi không tìm thấy.', knowledge: ['conventions', 'doc-review-rules'], usedBy: ['investigator', 'designer', 'doc-reviewer', 'implementer', 'reviewer', 'pr-creator'] },
+  'read-project-rules': { type: 'Skill · shared', typeClass: 'skill', desc: 'Single source of truth cho thứ tự và cách tìm convention rule của project (coding, doc-writing, doc-review, test, git-pr). Chỉ dev-team-orchestrator gọi — MỘT LẦN ở đầu pipeline, ghi project-rules.md rồi truyền phần rule tương ứng cho từng agent (agent không tự gọi). Bắt buộc: doc-writing (investigator/designer) và doc-review (doc-reviewer) — thiếu thì dừng. Fallback template: coding, test, git-pr. Tìm theo thứ tự: AGENTS.md/CLAUDE.md → .claude/rules/ hoặc .cursor/rules/. Không bịa rule.', knowledge: ['conventions', 'doc-review-rules'], usedBy: ['dev-team-orchestrator'] },
 
   'investigate.md': { type: 'Artifact', typeClass: 'artifact', desc: 'Kết quả survey: call chain trace, files liên quan, DB tables ảnh hưởng, risk assessment, blast radius, confidence score. Đầu vào của designer và doc-reviewer.', writtenBy: ['investigator'], readBy: ['designer', 'doc-reviewer'] },
   'design.md':      { type: 'Artifact', typeClass: 'artifact', desc: 'Design document §1–§7: tổng quan, investigation summary, so sánh giải pháp, schedule, implementation details, test notes. Đầu vào của doc-reviewer và implementer.', writtenBy: ['designer'], readBy: ['doc-reviewer', 'implementer'] },

@@ -77,6 +77,9 @@ Luôn trả về theo đúng cấu trúc sau (bỏ qua section của category kh
 
 ## Lưu ý cho skill/agent gọi nội bộ
 
+- **Caller chính là `dev-team-orchestrator`**: trong pipeline, orchestrator gọi skill này **một lần** (mọi category) ở đầu, ghi kết quả vào `tasks/<task-id>/project-rules.md`, rồi truyền phần rule tương ứng cho từng agent. Các agent **không tự gọi** skill này — chỉ đọc phần được chỉ định trong `project-rules.md`. Trường hợp chạy độc lập (ví dụ `/doc-review`) thì skill gọi tự nạp qua đây.
 - Skill này chỉ **tìm và trả về rule**, không áp dụng rule. Việc chấm điểm, review, hay enforce là trách nhiệm của skill gọi.
-- Skill gọi quyết định hành vi khi category cần thiết nằm trong "Không tìm thấy" (ví dụ: `doc-review` sẽ dừng xử lý, không review khi thiếu rule).
-- Rule trong project (tìm thấy qua skill này) **ưu tiên hơn** rule mặc định hardcode trong các reference skill của plugin (`coding-rules`, `write-design`, `write-tests`, `create-pr`) — các skill đó chỉ là fallback/template khi project chưa định nghĩa rule riêng.
+- Skill gọi (hoặc orchestrator) quyết định hành vi khi category cần thiết nằm trong "Không tìm thấy":
+  - **Bắt buộc** (dừng khi thiếu): `doc-writing` (investigator/designer) và `doc-review` (doc-reviewer).
+  - **Fallback template** (vẫn chạy khi thiếu): `coding`, `test`, `git-pr`.
+- Rule trong project (tìm thấy qua skill này) **ưu tiên hơn** rule mặc định hardcode trong các reference skill của plugin (`coding-rules`, `write-design`, `write-tests`, `create-pr`) — với category fallback, các skill đó là template khi project chưa định nghĩa; với category bắt buộc, không có template fallback.

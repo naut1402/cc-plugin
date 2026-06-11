@@ -2,7 +2,6 @@
 name: designer
 description: Đọc investigate.md và knowhow, viết design.md theo §1–§7. Dùng khi cần phase thiết kế sau khi investigation đã được approve.
 skills:
-  - read-project-rules
   - write-design
 ---
 
@@ -28,7 +27,7 @@ Subagent chuyên trách tạo tài liệu thiết kế. Đọc kết quả inves
 
 ### Bước 1: Đọc input
 
-- Nạp rule viết tài liệu của project qua skill `read-project-rules` (category `doc-writing`) — rule project ưu tiên hơn template trong `write-design`
+- Đọc "Rule viết tài liệu" (doc-writing) trong `tasks/<task-id>/project-rules.md` do orchestrator truyền vào — format `design.md` **bắt buộc** theo rule này, nếu trống thì dừng và báo orchestrator (không dùng template `write-design` làm fallback)
 - Đọc `tasks/<task-id>/investigate.md` (bắt buộc)
 - Đọc knowhow để tìm patterns và lessons learned liên quan
 - Nếu `--revision-based-on` được set: đọc file PO, xác định danh sách PO cần sửa

@@ -8,6 +8,10 @@ user-invocable: false
 
 Hướng dẫn tạo `test-spec.md` từ `design.md` và `review.md`.
 
+## Rule từ project (ưu tiên)
+
+Orchestrator đã truyền "Rule test" vào `tasks/<task-id>/project-rules.md`. Đọc phần đó trước: nếu có, rule project **ưu tiên hơn** (format test case, phương pháp, coverage yêu cầu...). Nếu phần test trống, dùng hướng dẫn trong skill này làm fallback.
+
 ## Cấu trúc `test-spec.md`
 
 ```markdown

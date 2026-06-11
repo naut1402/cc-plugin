@@ -38,7 +38,9 @@ Nếu có điểm mơ hồ trong §4 cần xác nhận trước khi code:
 
 #### Bước 2: Viết code
 
-Tuân theo `coding-rules`:
+Đọc "Rule coding" trong `tasks/<task-id>/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn khi xung đột; nếu phần coding trống thì dùng `coding-rules` làm fallback.
+
+Tuân theo rule coding (project rule ưu tiên, `coding-rules` fallback):
 - Chỉ sửa files được chỉ định trong design §4.1
 - Không refactor code ngoài scope
 - Security: prepared statements, htmlspecialchars, CSRF

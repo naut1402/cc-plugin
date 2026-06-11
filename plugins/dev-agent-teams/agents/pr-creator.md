@@ -32,7 +32,9 @@ Subagent cuối pipeline — amend commit `wip: implement <task-id>` thành comm
 
 ### Bước 2: Soạn branch name
 
-Theo convention trong `create-pr`:
+Đọc "Rule git/PR" trong `tasks/<task-id>/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn ở các bước 2–4; nếu phần git-pr trống thì dùng `create-pr` làm fallback.
+
+Theo convention git/PR (project rule ưu tiên, `create-pr` fallback):
 - `fix/<task-id>-<short-description>` cho bug fix
 - `feat/<task-id>-<short-description>` cho feature
 

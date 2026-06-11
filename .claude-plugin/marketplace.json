@@ -36,6 +36,11 @@
       "name": "dev-agent-teams",
       "description": "Multi-agent development pipeline: investigate → design → implement → review → PR",
       "source": "./plugins/dev-agent-teams"
+    },
+    {
+      "name": "session-retrospective",
+      "description": "Post-task knowledge distillation and pipeline analysis",
+      "source": "./plugins/session-retrospective"
     }
   ]
 }

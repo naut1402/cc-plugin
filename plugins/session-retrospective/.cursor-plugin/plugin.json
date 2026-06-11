@@ -1,0 +1,10 @@
+{
+  "name": "session-retrospective",
+  "description": "Post-task knowledge distillation and pipeline analysis",
+  "version": "0.0.1",
+  "author": {
+    "name": "tttuan"
+  },
+  "license": "Apache-2.0",
+  "skills": ["./skills/"]
+}

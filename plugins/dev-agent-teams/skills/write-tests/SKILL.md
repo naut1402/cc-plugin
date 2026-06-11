@@ -8,6 +8,10 @@ user-invocable: false
 
 Hướng dẫn tạo `test-spec.md` từ `design.md` và `review.md`.
 
+## Nạp rule từ project trước
+
+Trước khi viết test spec, nạp rule của project qua skill `read-project-rules` với category `test`. Nếu project có định nghĩa rule test riêng (format test case, phương pháp, coverage yêu cầu...), rule đó **ưu tiên hơn** — hướng dẫn bên dưới chỉ là fallback khi project chưa định nghĩa.
+
 ## Cấu trúc `test-spec.md`
 
 ```markdown

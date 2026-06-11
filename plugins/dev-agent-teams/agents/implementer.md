@@ -2,6 +2,7 @@
 name: implementer
 description: Viết code theo design.md (phase 1), chạy PHPStan và ghi kết quả (phase 2). Commit sau khi xong. Dùng khi cần phase implement sau khi design đã được approve.
 skills:
+  - read-project-rules
   - coding-rules
   - run-phpstan
 ---
@@ -37,6 +38,8 @@ Nếu có điểm mơ hồ trong §4 cần xác nhận trước khi code:
 - Dừng — không implement phần chưa rõ
 
 #### Bước 2: Viết code
+
+Nạp rule coding của project qua skill `read-project-rules` (category `coding`) — rule project ưu tiên hơn khi xung đột với `coding-rules`.
 
 Tuân theo `coding-rules`:
 - Chỉ sửa files được chỉ định trong design §4.1

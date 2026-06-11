@@ -2,6 +2,7 @@
 name: investigator
 description: Survey codebase, trace call chain từ entry point, xác định phạm vi ảnh hưởng và blast radius. Tạo investigate.md. Dùng khi cần phase điều tra cho một dev task.
 skills:
+  - read-project-rules
   - survey-codebase
 ---
 
@@ -55,6 +56,8 @@ Nếu gặp ambiguity cần human quyết định trước khi tiếp tục:
 3. Dừng — orchestrator sẽ thông báo user
 
 ### Bước 5: Ghi investigate.md
+
+Nạp rule viết tài liệu của project qua skill `read-project-rules` (category `doc-writing`) — rule project ưu tiên hơn format trong `survey-codebase`.
 
 Ghi `tasks/<task-id>/investigate.md` theo template trong skill `survey-codebase`. Đảm bảo:
 - Đủ 7 section

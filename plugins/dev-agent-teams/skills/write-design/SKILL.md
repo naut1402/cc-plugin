@@ -8,6 +8,10 @@ user-invocable: false
 
 Template và hướng dẫn viết tài liệu thiết kế `design.md` theo chuẩn dự án.
 
+## Nạp rule từ project trước
+
+Trước khi viết, nạp rule của project qua skill `read-project-rules` với category `doc-writing`. Nếu project có định nghĩa rule viết tài liệu riêng (cấu trúc section, văn phong, ngôn ngữ...), rule đó **ưu tiên hơn** template bên dưới — template này chỉ là fallback khi project chưa định nghĩa.
+
 ## Cấu trúc `design.md`
 
 ```markdown

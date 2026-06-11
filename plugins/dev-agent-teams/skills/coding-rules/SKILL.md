@@ -8,6 +8,10 @@ user-invocable: false
 
 Quy tắc viết code và tiêu chuẩn chất lượng cho dự án 楽楽販売 (PHP).
 
+## Nạp rule từ project trước
+
+Trước khi áp dụng rule trong skill này, nạp rule của project qua skill `read-project-rules` với category `coding`. Nếu project có định nghĩa rule coding riêng, rule đó **ưu tiên hơn** khi xung đột — skill này chỉ là fallback/bổ sung khi project chưa định nghĩa.
+
 ## Nguyên tắc cốt lõi
 
 - **Không sửa ngoài scope fix**: Chỉ chỉnh code liên quan trực tiếp đến task. Không refactor cơ hội.

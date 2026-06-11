@@ -8,6 +8,10 @@ user-invocable: false
 
 Hướng dẫn cách đọc và phân tích codebase 楽楽販売 (hanbai-product) để tạo `investigate.md`.
 
+## Nạp rule từ project trước
+
+Trước khi ghi `investigate.md`, nạp rule của project qua skill `read-project-rules` với category `doc-writing`. Nếu project có định nghĩa rule viết tài liệu riêng, rule đó **ưu tiên hơn** format bên dưới — format này chỉ là fallback khi project chưa định nghĩa.
+
 ## Mục tiêu
 
 Xác định chính xác phạm vi ảnh hưởng (blast radius) của task, trace call chain từ entry point, tránh bỏ sót hoặc over-scope.

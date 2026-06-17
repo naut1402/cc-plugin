@@ -7,7 +7,7 @@ user-invocable: true
 
 # Dev Team Orchestrator
 
-Skill điều phối toàn bộ pipeline phát triển. Đọc skill này, Claude Code gọi tuần tự 6 agent qua Task tool, duy trì trạng thái trong `.dev-state/<task-id>.json`, và chờ human approval tại các HITL checkpoint.
+Skill điều phối toàn bộ pipeline phát triển. Đọc skill này, Claude Code gọi tuần tự 6 agent qua Task tool, duy trì trạng thái trong `.dev-team-agent/.dev-state/<task-id>.json`, và chờ human approval tại các HITL checkpoint.
 
 **Project rules nạp tập trung**: orchestrator gọi skill `read-project-rules` **một lần** ở đầu pipeline, ghi `project-rules.md`, rồi truyền phần rule tương ứng cho từng agent. Agent **không tự gọi** `read-project-rules` — chỉ đọc phần được chỉ định trong `project-rules.md`. Xem mục **Truyền rule cho agent**.
 
@@ -16,31 +16,39 @@ Skill điều phối toàn bộ pipeline phát triển. Đọc skill này, Claud
 `$ARGUMENTS` = `<task-id> [--resume] [--subtask-of=<parent-id>] [--auto-review]`
 
 - `<task-id>`: ID tác vụ (ví dụ `B4488`, `F003`, `U00281`). Bắt buộc.
-- `--resume`: Tiếp tục từ phase đang dở (đọc `.dev-state/<task-id>.json`).
+- `--resume`: Tiếp tục từ phase đang dở (đọc `.dev-team-agent/.dev-state/<task-id>.json`).
 - `--subtask-of=<parent-id>`: Khai báo subtask — kế thừa `investigate.md` và `design.md` từ parent nếu subtask chưa có.
 - `--auto-review`: Tự động chạy doc-reviewer sau HITL #1 và #2 mà không hỏi human. Phù hợp khi muốn chạy pipeline liên tục, ít tương tác.
 
 ## Cấu trúc thư mục task
 
+Mọi artifact và state của pipeline nằm dưới một root thống nhất `.dev-team-agent/` ở gốc project (state ở `.dev-state/`, tài liệu ở `tasks/`). Plugin `dev-dashboard` đọc đúng root này để dựng dashboard.
+
 ```
-tasks/
-  <task-id>/
-    project-rules.md       # rule project nạp một lần ở đầu pipeline
-    investigate.md
-    design.md
-    investigate-po.md      # nếu doc-reviewer chạy cho investigate
-    design-po.md           # nếu doc-reviewer chạy cho design
-    phpstan.md
-    review.md
-    test-spec.md
-    pr-desc.md
-    qa.md                  # Q&A blocking questions (nếu có)
-    <subtask-id>/          # workspace riêng cho subtask
+.dev-team-agent/
+  .dev-state/
+    <task-id>.json         # state file (xem bên dưới)
+  tasks/
+    <task-id>/
+      project-rules.md     # rule project nạp một lần ở đầu pipeline
+      investigate.md
+      design.md
+      investigate-po.md    # nếu doc-reviewer chạy cho investigate
+      design-po.md         # nếu doc-reviewer chạy cho design
+      phpstan.md
       review.md
-      ...
+      test-spec.md
+      pr-desc.md
+      qa.md                # Q&A blocking questions (nếu có)
+      <subtask-id>/        # workspace riêng cho subtask
+        review.md
+        ...
+  viewer/                  # app dashboard — chỉ xuất hiện sau khi chạy /dev-dashboard
 ```
 
-## State file: `.dev-state/<task-id>.json`
+> Migrate: nếu project còn `tasks/` và `.dev-state/` ở gốc (cấu trúc cũ), skill `/dev-dashboard` sẽ gom chúng vào `.dev-team-agent/`. Orchestrator từ phiên bản này luôn đọc/ghi theo root mới.
+
+## State file: `.dev-team-agent/.dev-state/<task-id>.json`
 
 ```json
 {
@@ -67,7 +75,7 @@ tasks/
 
 Chỉ orchestrator đọc và ghi file này. Không encode "phase X đã xong" — status suy ra từ sự tồn tại và tính hợp lệ của artifact.
 
-## File Q&A: `tasks/<task-id>/qa.md`
+## File Q&A: `.dev-team-agent/tasks/<task-id>/qa.md`
 
 Agent ghi câu hỏi blocking vào đây khi gặp ambiguity cần human quyết định. Orchestrator phát hiện file này được tạo mới → dừng pipeline → thông báo user → chờ user trả lời và confirm.
 
@@ -87,12 +95,12 @@ Format:
 
 ### Khởi tạo
 
-1. Tạo thư mục `tasks/<task-id>/` nếu chưa có.
-2. Đọc `.dev-state/<task-id>.json`:
+1. Tạo thư mục `.dev-team-agent/tasks/<task-id>/` nếu chưa có.
+2. Đọc `.dev-team-agent/.dev-state/<task-id>.json`:
    - Nếu chưa có: tạo mới với `current_phase = "investigator"`, `auto_review = (--auto-review có mặt)`.
    - Nếu có `--resume`: đọc `current_phase` và tiếp tục từ đó. Nếu đồng thời có `--auto-review`, cập nhật `auto_review = true`.
 3. Nếu có `--subtask-of=<parent-id>`: điền `parent_task_id` và `inherit_from_parent` (thường `["investigate.md", "design.md"]`).
-4. **Nạp project rules (một lần cho cả pipeline)**: gọi skill `read-project-rules` (tất cả category), ghi kết quả vào `tasks/<task-id>/project-rules.md`.
+4. **Nạp project rules (một lần cho cả pipeline)**: gọi skill `read-project-rules` (tất cả category), ghi kết quả vào `.dev-team-agent/tasks/<task-id>/project-rules.md`.
    - Trên `--resume`: nếu `project-rules.md` đã tồn tại thì dùng lại, không gọi lại.
    - **Validate bắt buộc**: nếu category `doc-writing` nằm trong phần "Không tìm thấy" của kết quả → **dừng pipeline ngay**, báo user nơi đã tìm và lý do (investigator và designer bắt buộc cần format từ doc-writing rule, không có fallback). Các category còn lại (coding, test, git-pr) nếu thiếu thì agent tương ứng dùng fallback template.
    - Subtask kế thừa `project-rules.md` từ parent nếu chưa có (xem **Subtask inheritance**).
@@ -119,10 +127,10 @@ Cập nhật state: `current_phase = "investigator"`.
 Spawn `dev-agent-teams:investigator` qua Task tool:
 ```
 Task: investigator <task-id>
-  → áp dụng "Rule viết tài liệu" trong tasks/<task-id>/project-rules.md (bắt buộc)
+  → áp dụng "Rule viết tài liệu" trong .dev-team-agent/tasks/<task-id>/project-rules.md (bắt buộc)
 ```
 
-Agent ghi `tasks/<task-id>/investigate.md`. Nếu agent tạo `qa.md` → **Q&A HITL** (xem bên dưới).
+Agent ghi `.dev-team-agent/tasks/<task-id>/investigate.md`. Nếu agent tạo `qa.md` → **Q&A HITL** (xem bên dưới).
 
 ### HITL #1 — Duyệt investigate.md
 
@@ -132,7 +140,7 @@ Khi investigator hoàn tất: cập nhật `hitl_pending = "hitl-1"`.
 
 **Nếu `auto_review = false`**: thông báo user:
 ```
-✅ Investigator xong. Vui lòng đọc tasks/<task-id>/investigate.md và xác nhận.
+✅ Investigator xong. Vui lòng đọc .dev-team-agent/tasks/<task-id>/investigate.md và xác nhận.
 Sau khi duyệt, gõ "approved" (hoặc feedback cần sửa).
 Có muốn chạy doc-reviewer cho investigate.md không? (yes/no)
 ```
@@ -148,7 +156,7 @@ Cập nhật state: `current_phase = "designer"`, `hitl_pending = null`.
 Spawn `dev-agent-teams:designer`:
 ```
 Task: designer <task-id>
-  → áp dụng "Rule viết tài liệu" trong tasks/<task-id>/project-rules.md (bắt buộc)
+  → áp dụng "Rule viết tài liệu" trong .dev-team-agent/tasks/<task-id>/project-rules.md (bắt buộc)
 ```
 
 Agent đọc `investigate.md` và `knowhow`, ghi `design.md`. Nếu tạo `qa.md` → **Q&A HITL**.
@@ -169,7 +177,7 @@ Cập nhật state: `current_phase = "implementer"`, `hitl_pending = null`.
 Spawn `dev-agent-teams:implementer`:
 ```
 Task: implementer <task-id>
-  → áp dụng "Rule coding" trong tasks/<task-id>/project-rules.md (fallback coding-rules nếu trống)
+  → áp dụng "Rule coding" trong .dev-team-agent/tasks/<task-id>/project-rules.md (fallback coding-rules nếu trống)
 ```
 
 Agent chạy 2 phase nội tại (code + phpstan), commit thay đổi và ghi `phpstan.md`. Nếu tạo `qa.md` → **Q&A HITL**.
@@ -181,7 +189,7 @@ Cập nhật state: `current_phase = "reviewer"`.
 Spawn `dev-agent-teams:reviewer`:
 ```
 Task: reviewer <task-id>
-  → áp dụng "Rule coding" + "Rule test" trong tasks/<task-id>/project-rules.md (fallback nếu trống)
+  → áp dụng "Rule coding" + "Rule test" trong .dev-team-agent/tasks/<task-id>/project-rules.md (fallback nếu trống)
 ```
 
 Agent ghi `review.md` và `test-spec.md`.
@@ -203,7 +211,7 @@ Cập nhật state: `current_phase = "pr-creator"`, `hitl_pending = null`.
 Spawn `dev-agent-teams:pr-creator`:
 ```
 Task: pr-creator <task-id>
-  → áp dụng "Rule git/PR" trong tasks/<task-id>/project-rules.md (fallback create-pr nếu trống)
+  → áp dụng "Rule git/PR" trong .dev-team-agent/tasks/<task-id>/project-rules.md (fallback create-pr nếu trống)
 ```
 
 Agent ghi `pr-desc.md`. Orchestrator thông báo hoàn tất và đường dẫn `pr-desc.md`.
@@ -221,7 +229,7 @@ Cập nhật `hitl_pending = "hitl-doc"`, `doc_review_round.<doc>++`.
 Spawn `dev-agent-teams:doc-reviewer`:
 ```
 Task: doc-reviewer <task-id> --doc=<investigate|design>
-  → áp dụng "Rule review doc" trong tasks/<task-id>/project-rules.md (bắt buộc)
+  → áp dụng "Rule review doc" trong .dev-team-agent/tasks/<task-id>/project-rules.md (bắt buộc)
 ```
 
 Agent ghi `{doc}-po.md`. Thông báo user đọc file PO:
@@ -235,7 +243,7 @@ Agent ghi `{doc}-po.md`. Thông báo user đọc file PO:
 Xảy ra bất kỳ lúc nào investigator / designer / implementer tạo `qa.md`.
 
 1. Orchestrator phát hiện `qa.md` được tạo/cập nhật → dừng pipeline.
-2. Thông báo: `⚠️ Agent có câu hỏi blocking. Vui lòng đọc tasks/<task-id>/qa.md, trả lời và gõ "done".`
+2. Thông báo: `⚠️ Agent có câu hỏi blocking. Vui lòng đọc .dev-team-agent/tasks/<task-id>/qa.md, trả lời và gõ "done".`
 3. Sau khi user confirm: đọc `current_phase` từ state → spawn lại đúng agent để tiếp tục.
 
 ---
@@ -243,8 +251,8 @@ Xảy ra bất kỳ lúc nào investigator / designer / implementer tạo `qa.md
 ## Subtask inheritance
 
 Khi `parent_task_id` được set:
-- `project-rules.md`: nếu subtask chưa có, copy từ `tasks/<parent-id>/project-rules.md` (rule project không đổi giữa parent và subtask). Nếu parent cũng chưa có, nạp mới như Khởi tạo bước 4.
-- Trước khi spawn investigator: kiểm tra `tasks/<task-id>/investigate.md`.
-  - Nếu chưa có và `"investigate.md"` trong `inherit_from_parent`: copy từ `tasks/<parent-id>/investigate.md` hoặc truyền path cho agent đọc.
+- `project-rules.md`: nếu subtask chưa có, copy từ `.dev-team-agent/tasks/<parent-id>/project-rules.md` (rule project không đổi giữa parent và subtask). Nếu parent cũng chưa có, nạp mới như Khởi tạo bước 4.
+- Trước khi spawn investigator: kiểm tra `.dev-team-agent/tasks/<task-id>/investigate.md`.
+  - Nếu chưa có và `"investigate.md"` trong `inherit_from_parent`: copy từ `.dev-team-agent/tasks/<parent-id>/investigate.md` hoặc truyền path cho agent đọc.
 - Tương tự với `design.md`.
-- Subtask workspace: `tasks/<task-id>/` — không ghi vào thư mục của parent.
+- Subtask workspace: `.dev-team-agent/tasks/<task-id>/` — không ghi vào thư mục của parent.

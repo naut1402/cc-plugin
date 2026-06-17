@@ -10,7 +10,7 @@ Template và hướng dẫn viết tài liệu thiết kế `design.md` theo chu
 
 ## Format từ project rule (bắt buộc)
 
-Format của `design.md` **phải** lấy từ "Rule viết tài liệu" (doc-writing) mà orchestrator đã nạp và truyền vào `tasks/<task-id>/project-rules.md`. Đọc phần đó và tuân theo cấu trúc section, văn phong, ngôn ngữ quy định ở đó.
+Format của `design.md` **phải** lấy từ "Rule viết tài liệu" (doc-writing) mà orchestrator đã nạp và truyền vào `.dev-team-agent/tasks/<task-id>/project-rules.md`. Đọc phần đó và tuân theo cấu trúc section, văn phong, ngôn ngữ quy định ở đó.
 
 **Nếu phần doc-writing trống / không có rule**: dừng xử lý, báo orchestrator — **không** dùng template bên dưới làm fallback. (Orchestrator đã validate doc-writing ở đầu pipeline nên trường hợp này hiếm.)
 

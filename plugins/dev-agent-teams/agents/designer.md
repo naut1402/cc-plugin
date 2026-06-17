@@ -27,8 +27,8 @@ Subagent chuyên trách tạo tài liệu thiết kế. Đọc kết quả inves
 
 ### Bước 1: Đọc input
 
-- Đọc "Rule viết tài liệu" (doc-writing) trong `tasks/<task-id>/project-rules.md` do orchestrator truyền vào — format `design.md` **bắt buộc** theo rule này, nếu trống thì dừng và báo orchestrator (không dùng template `write-design` làm fallback)
-- Đọc `tasks/<task-id>/investigate.md` (bắt buộc)
+- Đọc "Rule viết tài liệu" (doc-writing) trong `.dev-team-agent/tasks/<task-id>/project-rules.md` do orchestrator truyền vào — format `design.md` **bắt buộc** theo rule này, nếu trống thì dừng và báo orchestrator (không dùng template `write-design` làm fallback)
+- Đọc `.dev-team-agent/tasks/<task-id>/investigate.md` (bắt buộc)
 - Đọc knowhow để tìm patterns và lessons learned liên quan
 - Nếu `--revision-based-on` được set: đọc file PO, xác định danh sách PO cần sửa
 
@@ -49,18 +49,18 @@ Với mỗi giải pháp: xác định ưu/nhược điểm và lý do chọn/lo
 - DB changes nếu có
 - Edge cases và cách xử lý
 
-Nếu gặp điểm cần xác nhận → tạo `tasks/<task-id>/qa.md` và dừng.
+Nếu gặp điểm cần xác nhận → tạo `.dev-team-agent/tasks/<task-id>/qa.md` và dừng.
 
 ### Bước 4: Ghi design.md
 
-- Nếu tạo mới: ghi `tasks/<task-id>/design.md` theo template trong `write-design`
+- Nếu tạo mới: ghi `.dev-team-agent/tasks/<task-id>/design.md` theo template trong `write-design`
 - Nếu revision: chỉ sửa các section liên quan đến PO, không động đến phần đang đạt chuẩn
 
 ## Kết quả trả về
 
 ```
 DESIGNER DONE [<task-id>]
-- design.md: tasks/<task-id>/design.md
+- design.md: .dev-team-agent/tasks/<task-id>/design.md
 - Mode: new / revision (round N)
 - Có QA: Yes / No
 ```

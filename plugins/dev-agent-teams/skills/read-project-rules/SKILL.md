@@ -1,4 +1,4 @@
----
+→---
 name: read-project-rules
 description: Tìm và nạp convention rule của project (rule coding, rule viết tài liệu, rule review doc, rule test, rule git/PR) theo thứ tự tìm kiếm thống nhất. Dùng khi bất kỳ skill/agent nào cần biết rule của project trước khi viết code, viết tài liệu, tạo test, hay review — hoặc gọi trực tiếp để xem project đang định nghĩa những rule gì và ở đâu.
 argument-hint: "[category] — coding | doc-writing | doc-review | test | git-pr (bỏ trống = tất cả)"
@@ -77,7 +77,7 @@ Luôn trả về theo đúng cấu trúc sau (bỏ qua section của category kh
 
 ## Lưu ý cho skill/agent gọi nội bộ
 
-- **Caller chính là `dev-team-orchestrator`**: trong pipeline, orchestrator gọi skill này **một lần** (mọi category) ở đầu, ghi kết quả vào `tasks/<task-id>/project-rules.md`, rồi truyền phần rule tương ứng cho từng agent. Các agent **không tự gọi** skill này — chỉ đọc phần được chỉ định trong `project-rules.md`. Trường hợp chạy độc lập (ví dụ `/doc-review`) thì skill gọi tự nạp qua đây.
+- **Caller chính là `dev-team-orchestrator`**: trong pipeline, orchestrator gọi skill này **một lần** (mọi category) ở đầu, ghi kết quả vào `.dev-team-agent/tasks/<task-id>/project-rules.md`, rồi truyền phần rule tương ứng cho từng agent. Các agent **không tự gọi** skill này — chỉ đọc phần được chỉ định trong `project-rules.md`. Trường hợp chạy độc lập (ví dụ `/doc-review`) thì skill gọi tự nạp qua đây.
 - Skill này chỉ **tìm và trả về rule**, không áp dụng rule. Việc chấm điểm, review, hay enforce là trách nhiệm của skill gọi.
 - Skill gọi (hoặc orchestrator) quyết định hành vi khi category cần thiết nằm trong "Không tìm thấy":
   - **Bắt buộc** (dừng khi thiếu): `doc-writing` (investigator/designer) và `doc-review` (doc-reviewer).

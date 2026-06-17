@@ -90,8 +90,10 @@ All plugins are registered in `.claude-plugin/marketplace.json`. When adding a n
 | `task-memory` | Task context lifecycle: `/prepare-context`, `/init-task-memory`, `/load-domain-context`. Includes a `UserPromptSubmit` hook that auto-detects task IDs (pattern `B\d{4,5}`, `U\d{4,6}`, `F\d{3,5}`) and triggers `/prepare-context`. |
 | `task-memory-serena` | Contract skills for working memory via **Serena MCP**: read/write/edit/search/delete. These are `user-invocable: false` — called internally by `task-memory`. |
 | `task-memory-agentmemory` | Same contract skills as `task-memory-serena` but backed by **agentmemory MCP**. Drop-in alternative. |
-| `task-memory-silverbullet` | Same contract skills backed by **SilverBullet MCP** (`silverbullet-mcp`). Notes stored as `working-memory/<key>.md`. Requires `userConfig`: MCP URL + auth token. Drop-in alternative. |
+| `task-memory-silverbullet` | Same contract skills backed by **SilverBullet MCP** (`silverbullet-mcp`). Notes stored as `working-memory/<key>.md`. Requires running [silverbullet-mcp](https://github.com/Ahmad-A0/silverbullet-mcp) server + `userConfig` (Claude Code) or env vars `SILVERBULLET_MCP_URL` / `SILVERBULLET_MCP_TOKEN` (Cursor). Drop-in alternative. |
 | `document-writting` | Document generation skills for the 楽楽販売 PHP project: impact analysis, surveys, detail design, test matrices, document review. Uses Serena MCP to inspect a codebase at `C:\Users\tttuan\PhpstormProjects\hanbai-product`. |
+| `dev-agent-teams` | Multi-agent development pipeline: investigate → design → implement → review → PR. Orchestrator skill with HITL checkpoints. State + artifacts live under `.dev-team-agent/` (`.dev-state/<id>.json` + `tasks/<id>/`). Includes `/dev-dashboard` — a Vue+Vite dashboard that reads `.dev-team-agent/` and visualizes pipeline state in realtime. |
+| `session-retrospective` | Post-task meta skills: `/distill-knowledge` (chắt lọc glossary/flow/domain, gợi ý human lưu memory) và `/analysis-working-pipeline` (phân tích session, sơ đồ suy luận, đề xuất cải tiến). Gọi thủ công — không tích hợp orchestrator. |
 
 ## Architecture: task-memory call chain
 

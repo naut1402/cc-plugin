@@ -50,7 +50,7 @@ Với mỗi phase (hoặc phase trong `--focus`):
 3. **Tool/Skill** — MCP, Task subagent, skill invoke, file read/write
 4. **Kết quả** — artifact tạo ra hoặc quyết định rẽ nhánh
 
-Đọc thêm artifacts trong `tasks/<task-id>/` và `.dev-state/<task-id>.json` (nếu có) để bổ sung timeline.
+Đọc thêm artifacts trong `.dev-team-agent/tasks/<task-id>/` và `.dev-team-agent/.dev-state/<task-id>.json` (nếu có) để bổ sung timeline.
 
 ### 2. Vẽ sơ đồ suy luận AI
 
@@ -107,9 +107,9 @@ Mỗi đề xuất gồm: mô tả, effort (S/M/L), impact, phạm vi file/plugi
 
 ### 5. Output
 
-1. Tạo thư mục `tasks/<task-id>/` nếu có task-id và chưa có.
+1. Tạo thư mục `.dev-team-agent/tasks/<task-id>/` nếu có task-id và chưa có.
 2. Ghi báo cáo theo [output-template.md](output-template.md):
-   - Có `task-id` → `tasks/<task-id>/pipeline-analysis.md`
+   - Có `task-id` → `.dev-team-agent/tasks/<task-id>/pipeline-analysis.md`
    - Không có `task-id` → `pipeline-analysis-<YYYY-MM-DD>.md` tại thư mục làm việc
 3. Thông báo user đường dẫn file và tóm tắt top 3 đề xuất P0/P1.
 
@@ -126,7 +126,7 @@ Mỗi đề xuất gồm: mô tả, effort (S/M/L), impact, phạm vi file/plugi
 ## Output trả về cho user
 
 ```markdown
-✅ Đã phân tích pipeline → tasks/<task-id>/pipeline-analysis.md
+✅ Đã phân tích pipeline → .dev-team-agent/tasks/<task-id>/pipeline-analysis.md
 
 Tóm tắt:
 - Phases: <N> | Tool calls ước tính: ~<N>

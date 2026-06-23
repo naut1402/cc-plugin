@@ -38,7 +38,7 @@ const ORDER = [
   'investigate.md', 'investigate-po.md',
   'design.md', 'design-po.md',
   'phpstan.md', 'review.md', 'test-spec.md', 'pr-desc.md',
-  'project-rules.md', 'qa.md',
+  'qa.md',
 ]
 
 function sortedArtifacts(task) {

@@ -8,8 +8,9 @@ import path from 'node:path'
 //
 //   GET /api/tasks                  → all tasks with state + artifact metadata + qa
 //   GET /api/artifact?id=..&name=.. → raw text of one artifact (markdown)
+//   GET /api/pipeline-export?id=..  → structured phase-summary JSON (machine-readable)
 //   GET /api/profile                → orchestrator flow profile (future: editable)
-//   POST /api/profile               → persist profile (stub, see TODO below)
+//   POST /api/profile               → persist profile (stub)
 
 // Artifacts we know how to map onto pipeline phases. Anything else found in a
 // task directory is still surfaced under "other" so nothing is hidden.
@@ -43,6 +44,9 @@ async function statSafe(p) {
   }
 }
 
+// pipeline-export.json is machine-readable only — excluded from the UI artifact list.
+const MACHINE_FILES = new Set(['pipeline-export.json'])
+
 async function listArtifacts(taskDir) {
   const out = {}
   let entries = []
@@ -57,6 +61,7 @@ async function listArtifacts(taskDir) {
       subtasks.push(e.name)
       continue
     }
+    if (MACHINE_FILES.has(e.name)) continue
     if (e.name.endsWith('.md')) {
       const meta = await statSafe(path.join(taskDir, e.name))
       out[e.name] = { exists: true, mtime: meta.mtime, size: meta.size }
@@ -112,9 +117,12 @@ async function collectTasks(root) {
     const { artifacts, subtasks } = await listArtifacts(taskDir)
 
     let qa = null
+    let qa_count = 0
     if (artifacts['qa.md'] && artifacts['qa.md'].exists) {
       try {
         qa = await fs.readFile(path.join(taskDir, 'qa.md'), 'utf8')
+        // Count Q&A items: each question starts with a level-2 heading "## Q"
+        qa_count = (qa.match(/^##\s+Q\d/gm) || []).length
       } catch {
         qa = null
       }
@@ -134,9 +142,11 @@ async function collectTasks(root) {
       auto_review: state?.auto_review ?? false,
       doc_review_round: state?.doc_review_round ?? { investigate: 0, design: 0 },
       inherit_from_parent: state?.inherit_from_parent ?? [],
+      export_json: state?.export_json ?? false,
       artifacts,
       subtasks,
       has_qa: !!(artifacts['qa.md'] && artifacts['qa.md'].exists),
+      qa_count,
       qa,
     })
   }
@@ -149,6 +159,10 @@ function resolveArtifact(root, id, name) {
   const target = path.resolve(taskDir, name)
   if (target !== taskDir && !target.startsWith(taskDir + path.sep)) return null
   return target
+}
+
+function flowProfilePath(root, id) {
+  return path.join(root, 'flow-profiles', `${id}.json`)
 }
 
 export function devTeamApi({ root }) {
@@ -195,11 +209,52 @@ export function devTeamApi({ root }) {
                 return json(res, 200, { profile: null, exists: false })
               }
             }
-            // TODO(profile): future — accept POST to persist an edited flow
-            // profile that the orchestrator reads at pipeline start. For now we
-            // only acknowledge so the UI can be built against a real endpoint.
             if (req.method === 'POST') {
               return json(res, 501, { error: 'profile editing not implemented yet' })
+            }
+          }
+
+          // Structured phase-summary export (machine-readable, written by orchestrator
+          // when --export-json flag is active).
+          if (url.pathname === '/api/pipeline-export' && req.method === 'GET') {
+            const id = url.searchParams.get('id') || ''
+            if (!id) return json(res, 400, { error: 'missing id' })
+            const fp = path.join(root, 'tasks', id, 'pipeline-export.json')
+            try {
+              const raw = await fs.readFile(fp, 'utf8')
+              return json(res, 200, { id, export: JSON.parse(raw), exists: true })
+            } catch {
+              return json(res, 200, { id, export: null, exists: false })
+            }
+          }
+
+          // Per-task flow profiles: GET reads, POST creates/updates.
+          if (url.pathname === '/api/flow-profile') {
+            const id = url.searchParams.get('id') || ''
+            if (!id) return json(res, 400, { error: 'missing id' })
+            const fp = flowProfilePath(root, id)
+
+            if (req.method === 'GET') {
+              try {
+                const raw = await fs.readFile(fp, 'utf8')
+                return json(res, 200, { id, profile: JSON.parse(raw), exists: true })
+              } catch {
+                return json(res, 200, { id, profile: null, exists: false })
+              }
+            }
+
+            if (req.method === 'POST') {
+              let body = ''
+              for await (const chunk of req) body += chunk
+              let parsed
+              try {
+                parsed = JSON.parse(body)
+              } catch {
+                return json(res, 400, { error: 'invalid JSON body' })
+              }
+              await fs.mkdir(path.dirname(fp), { recursive: true })
+              await fs.writeFile(fp, JSON.stringify(parsed, null, 2), 'utf8')
+              return json(res, 200, { id, saved: true })
             }
           }
 

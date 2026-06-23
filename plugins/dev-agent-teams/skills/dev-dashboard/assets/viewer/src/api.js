@@ -12,6 +12,28 @@ export async function fetchArtifact(id, name) {
   return r.json()
 }
 
+export async function fetchPipelineExport(id) {
+  const r = await fetch(`/api/pipeline-export?id=${encodeURIComponent(id)}`)
+  if (!r.ok) throw new Error(`/api/pipeline-export → ${r.status}`)
+  return r.json()
+}
+
+export async function fetchFlowProfile(id) {
+  const r = await fetch(`/api/flow-profile?id=${encodeURIComponent(id)}`)
+  if (!r.ok) throw new Error(`/api/flow-profile → ${r.status}`)
+  return r.json()
+}
+
+export async function saveFlowProfile(id, profile) {
+  const r = await fetch(`/api/flow-profile?id=${encodeURIComponent(id)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(profile),
+  })
+  if (!r.ok) throw new Error(`/api/flow-profile POST → ${r.status}`)
+  return r.json()
+}
+
 // Pipeline definition shared by the UI. Order matters — it's the left→right
 // flow. `hitl` is the gate that follows the phase (if any).
 export const PHASES = [

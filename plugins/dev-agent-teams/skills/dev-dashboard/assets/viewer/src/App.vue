@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { fetchTasks } from './api.js'
 import TaskList from './components/TaskList.vue'
 import PipelineView from './components/PipelineView.vue'
@@ -14,6 +14,8 @@ const selectedId = ref(null)
 const error = ref(null)
 const lastUpdated = ref(null)
 const connected = ref(false)
+// Currently open artifact: { taskId, name } | null
+const openArtifact = ref(null)
 let timer = null
 
 const selected = computed(
@@ -28,7 +30,6 @@ async function poll() {
     connected.value = true
     error.value = null
     lastUpdated.value = new Date().toLocaleTimeString()
-    // Auto-select the first task that needs attention, else the first task.
     if (!selectedId.value && tasks.value.length) {
       const needsAttention = tasks.value.find((t) => t.has_qa || t.hitl_pending)
       selectedId.value = (needsAttention || tasks.value[0]).task_id
@@ -37,6 +38,16 @@ async function poll() {
     connected.value = false
     error.value = String(e.message || e)
   }
+}
+
+// Clear open artifact when selected task changes.
+watch(selectedId, () => {
+  openArtifact.value = null
+})
+
+function handleOpenArtifact({ taskId, name }) {
+  selectedId.value = taskId
+  openArtifact.value = { taskId, name }
 }
 
 onMounted(() => {
@@ -54,7 +65,13 @@ onUnmounted(() => clearInterval(timer))
         <span class="dot" :class="{ live: connected }" :title="connected ? 'live' : 'disconnected'"></span>
       </header>
       <p class="root" :title="root">{{ root || '…' }}</p>
-      <TaskList :tasks="tasks" :selected-id="selectedId" @select="selectedId = $event" />
+      <TaskList
+        :tasks="tasks"
+        :selected-id="selectedId"
+        :open-artifact="openArtifact"
+        @select="selectedId = $event"
+        @open-artifact="handleOpenArtifact"
+      />
       <footer class="status">
         <span v-if="error" class="err">⚠ {{ error }}</span>
         <span v-else-if="lastUpdated">cập nhật {{ lastUpdated }}</span>
@@ -80,7 +97,10 @@ onUnmounted(() => clearInterval(timer))
 
         <PipelineView :task="selected" />
 
-        <ArtifactPanel :task="selected" />
+        <ArtifactPanel
+          :task="selected"
+          :open-artifact="openArtifact && openArtifact.taskId === selected.task_id ? openArtifact : null"
+        />
       </template>
       <div v-else class="empty">
         <p v-if="!tasks.length && connected">

@@ -13,12 +13,13 @@ Skill điều phối toàn bộ pipeline phát triển. Đọc skill này, Claud
 
 ## Đầu vào
 
-`$ARGUMENTS` = `<task-id> [--resume] [--subtask-of=<parent-id>] [--auto-review]`
+`$ARGUMENTS` = `<task-id> [--resume] [--subtask-of=<parent-id>] [--auto-review] [--export-json]`
 
 - `<task-id>`: ID tác vụ (ví dụ `B4488`, `F003`, `U00281`). Bắt buộc.
 - `--resume`: Tiếp tục từ phase đang dở (đọc `.dev-team-agent/.dev-state/<task-id>.json`).
 - `--subtask-of=<parent-id>`: Khai báo subtask — kế thừa `investigate.md` và `design.md` từ parent nếu subtask chưa có.
 - `--auto-review`: Tự động chạy doc-reviewer sau HITL #1 và #2 mà không hỏi human. Phù hợp khi muốn chạy pipeline liên tục, ít tương tác.
+- `--export-json`: Sau mỗi phase, merge kết quả cấu trúc vào `.dev-team-agent/tasks/<task-id>/pipeline-export.json`. Dùng khi muốn dashboard hoặc tool ngoài đọc data machine-readable từ pipeline.
 
 ## Cấu trúc thư mục task
 
@@ -58,6 +59,7 @@ Mọi artifact và state của pipeline nằm dưới một root thống nhất 
   "hitl_pending": null,
   "review_round": 0,
   "auto_review": false,
+  "export_json": false,
   "doc_review_round": {
     "investigate": 0,
     "design": 0
@@ -70,6 +72,7 @@ Mọi artifact và state của pipeline nằm dưới một root thống nhất 
 - `hitl_pending`: checkpoint nào đang chờ duyệt (`"hitl-1"`, `"hitl-2"`, `"hitl-3"`, `"hitl-doc"`).
 - `review_round`: số vòng implementer được gọi lại sau HITL #3 (max 2).
 - `auto_review`: có tự động chạy doc-reviewer không (từ flag `--auto-review`).
+- `export_json`: có ghi `pipeline-export.json` sau mỗi phase không (từ flag `--export-json`).
 - `doc_review_round`: số vòng doc-reviewer đã chạy cho từng tài liệu.
 - `inherit_from_parent`: danh sách artifact kế thừa từ parent task (subtask only).
 
@@ -97,13 +100,33 @@ Format:
 
 1. Tạo thư mục `.dev-team-agent/tasks/<task-id>/` nếu chưa có.
 2. Đọc `.dev-team-agent/.dev-state/<task-id>.json`:
-   - Nếu chưa có: tạo mới với `current_phase = "investigator"`, `auto_review = (--auto-review có mặt)`.
-   - Nếu có `--resume`: đọc `current_phase` và tiếp tục từ đó. Nếu đồng thời có `--auto-review`, cập nhật `auto_review = true`.
+   - Nếu chưa có: tạo mới với `current_phase = "investigator"`, `auto_review = (--auto-review có mặt)`, `export_json = (--export-json có mặt)`.
+   - Nếu có `--resume`: đọc `current_phase` và tiếp tục từ đó. Nếu đồng thời có `--auto-review`, cập nhật `auto_review = true`. Nếu có `--export-json`, cập nhật `export_json = true`.
 3. Nếu có `--subtask-of=<parent-id>`: điền `parent_task_id` và `inherit_from_parent` (thường `["investigate.md", "design.md"]`).
 4. **Nạp project rules (một lần cho cả pipeline)**: gọi skill `read-project-rules` (tất cả category), ghi kết quả vào `.dev-team-agent/tasks/<task-id>/project-rules.md`.
    - Trên `--resume`: nếu `project-rules.md` đã tồn tại thì dùng lại, không gọi lại.
    - **Validate bắt buộc**: nếu category `doc-writing` nằm trong phần "Không tìm thấy" của kết quả → **dừng pipeline ngay**, báo user nơi đã tìm và lý do (investigator và designer bắt buộc cần format từ doc-writing rule, không có fallback). Các category còn lại (coding, test, git-pr) nếu thiếu thì agent tương ứng dùng fallback template.
    - Subtask kế thừa `project-rules.md` từ parent nếu chưa có (xem **Subtask inheritance**).
+
+## Export JSON (khi `export_json = true`)
+
+Sau khi mỗi agent hoàn tất và trả về kết quả, nếu `export_json = true`, orchestrator merge data cấu trúc vào file duy nhất `.dev-team-agent/tasks/<task-id>/pipeline-export.json`.
+
+**Cách merge** (đảm bảo không xóa data phase trước):
+1. Nếu file đã tồn tại: đọc JSON hiện tại → cập nhật `phases.<phase-key>` → ghi lại.
+2. Nếu file chưa có: tạo `{ "task_id": "<id>", "version": 1, "phases": { "<phase-key>": { ... } } }`.
+
+**Data cần ghi cho từng phase:**
+
+| Phase | Key trong `phases` | Fields cần ghi |
+|---|---|---|
+| investigator | `investigator` | `overall_confidence`, `entry_points[]`, `files_to_modify[]`, `open_questions[]`, `related_files_count`, `completed_at` |
+| designer | `designer` | `solution_chosen`, `alternatives_count`, `files_to_modify[]`, `completed_at` |
+| implementer | `implementer` | `phpstan_errors`, `phpstan_warnings`, `completed_at` |
+| reviewer | `reviewer` | `must_fix[]`, `should_fix[]`, `completed_at` |
+| pr-creator | `pr_creator` | `pr_title`, `completed_at` |
+
+**Quan trọng**: pass `export_json = true` cho agent trong task prompt để agent trả về structured summary trong kết quả. Agent sẽ ghi file này trực tiếp (xem `agents/investigator.md` Bước 6).
 
 ## Truyền rule cho agent
 

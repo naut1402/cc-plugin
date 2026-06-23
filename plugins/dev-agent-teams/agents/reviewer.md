@@ -32,7 +32,7 @@ Subagent chuyên trách code review và tạo test spec. Đọc git diff của c
 
 ### Bước 2: Review code
 
-Đọc "Rule coding" và "Rule test" trong `.dev-team-agent/tasks/<task-id>/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn khi xung đột; phần nào trống thì dùng `coding-rules`/`write-tests` làm fallback.
+Đọc "Rule coding" và "Rule test" trong `.dev-team-agent/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn khi xung đột; phần nào trống thì dùng `coding-rules`/`write-tests` làm fallback.
 
 Theo rule coding (project rule ưu tiên, `coding-rules` fallback), kiểm tra từng file trong diff:
 

@@ -10,7 +10,7 @@ Hướng dẫn cách đọc và phân tích codebase 楽楽販売 (hanbai-produc
 
 ## Format từ project rule (bắt buộc)
 
-Format của `investigate.md` **phải** lấy từ "Rule viết tài liệu" (doc-writing) mà orchestrator đã nạp và truyền vào `.dev-team-agent/tasks/<task-id>/project-rules.md`. Đọc phần đó và tuân theo cấu trúc, văn phong, ngôn ngữ quy định.
+Format của `investigate.md` **phải** lấy từ "Rule viết tài liệu" (doc-writing) mà orchestrator đã nạp và truyền vào `.dev-team-agent/project-rules.md`. Đọc phần đó và tuân theo cấu trúc, văn phong, ngôn ngữ quy định.
 
 **Nếu phần doc-writing trống / không có rule**: dừng xử lý, báo orchestrator — **không** dùng format mẫu bên dưới làm fallback.
 

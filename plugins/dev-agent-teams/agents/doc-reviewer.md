@@ -37,7 +37,7 @@ Subagent chuyên trách review chất lượng tài liệu kỹ thuật. Đánh 
 ### Bước 2: Đánh giá theo rules
 
 Theo workflow trong skill `doc-review`:
-- Lấy "Rule review doc" từ `.dev-team-agent/tasks/<task-id>/project-rules.md` do orchestrator truyền vào (chạy trực tiếp `/doc-review` thì tự nạp qua `read-project-rules`) — nếu không có rules hợp lệ thì dừng, không tự bịa rule
+- Lấy "Rule review doc" từ `.dev-team-agent/project-rules.md` do orchestrator truyền vào (chạy trực tiếp `/doc-review` thì tự nạp qua `read-project-rules`) — nếu không có rules hợp lệ thì dừng, không tự bịa rule
 - Áp dụng rules: nếu rules yêu cầu tính điểm thì chấm theo trọng số quy định, không thì chỉ liệt kê PO
 - Ghi nhận từng vấn đề cụ thể với vị trí (section + nội dung gây lỗi)
 

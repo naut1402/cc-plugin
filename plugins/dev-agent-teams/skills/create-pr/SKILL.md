@@ -10,7 +10,7 @@ Quy ước tạo branch, commit, và PR description cho dự án 楽楽販売.
 
 ## Rule từ project (ưu tiên)
 
-Orchestrator đã truyền "Rule git/PR" vào `.dev-team-agent/tasks/<task-id>/project-rules.md`. Đọc phần đó trước: nếu có, convention project **ưu tiên hơn**. Nếu phần git-pr trống, dùng convention trong skill này làm fallback.
+Orchestrator đã truyền "Rule git/PR" vào `.dev-team-agent/project-rules.md`. Đọc phần đó trước: nếu có, convention project **ưu tiên hơn**. Nếu phần git-pr trống, dùng convention trong skill này làm fallback.
 
 ## Branch naming
 

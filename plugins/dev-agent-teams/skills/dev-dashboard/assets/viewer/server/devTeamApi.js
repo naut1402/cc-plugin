@@ -15,7 +15,6 @@ import path from 'node:path'
 // Artifacts we know how to map onto pipeline phases. Anything else found in a
 // task directory is still surfaced under "other" so nothing is hidden.
 const KNOWN_ARTIFACTS = [
-  'project-rules.md',
   'investigate.md',
   'investigate-po.md',
   'design.md',

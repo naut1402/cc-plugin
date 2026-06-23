@@ -5,11 +5,11 @@
       "args": [
         "-y",
         "mcp-remote",
-        "${SILVERBULLET_MCP_URL}",
+        "${user_config.mcp_url}",
         "--transport",
         "http-only",
         "--header",
-        "Authorization:Bearer ${SILVERBULLET_MCP_TOKEN}"
+        "Authorization:Bearer ${user_config.mcp_token}"
       ]
     }
   }

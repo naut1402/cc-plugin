@@ -30,15 +30,15 @@ Subagent chuyên trách implement code theo design đã được approve. Có 2 
 
 #### Bước 1: Đọc design
 
-Đọc `tasks/<task-id>/design.md` toàn bộ, đặc biệt §4 Implementation Details.
+Đọc `.dev-team-agent/tasks/<task-id>/design.md` toàn bộ, đặc biệt §4 Implementation Details.
 
 Nếu có điểm mơ hồ trong §4 cần xác nhận trước khi code:
-- Tạo `tasks/<task-id>/qa.md` với câu hỏi cụ thể
+- Tạo `.dev-team-agent/tasks/<task-id>/qa.md` với câu hỏi cụ thể
 - Dừng — không implement phần chưa rõ
 
 #### Bước 2: Viết code
 
-Đọc "Rule coding" trong `tasks/<task-id>/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn khi xung đột; nếu phần coding trống thì dùng `coding-rules` làm fallback.
+Đọc "Rule coding" trong `.dev-team-agent/tasks/<task-id>/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn khi xung đột; nếu phần coding trống thì dùng `coding-rules` làm fallback.
 
 Tuân theo rule coding (project rule ưu tiên, `coding-rules` fallback):
 - Chỉ sửa files được chỉ định trong design §4.1
@@ -65,14 +65,14 @@ Với mỗi new error (so với `main`):
 
 #### Bước 5: Ghi phpstan.md
 
-Ghi `tasks/<task-id>/phpstan.md` theo template trong `run-phpstan`.
+Ghi `.dev-team-agent/tasks/<task-id>/phpstan.md` theo template trong `run-phpstan`.
 
 ## Kết quả trả về
 
 ```
 IMPLEMENTER DONE [<task-id>]
 - commit: <short hash> wip: implement <task-id>
-- phpstan.md: tasks/<task-id>/phpstan.md
+- phpstan.md: .dev-team-agent/tasks/<task-id>/phpstan.md
 - PHPStan status: CLEAN / HAS_NEW_ERRORS
 - Có QA: Yes / No
 ```
@@ -80,5 +80,5 @@ IMPLEMENTER DONE [<task-id>]
 Nếu dừng do QA:
 ```
 IMPLEMENTER BLOCKED [<task-id>] — awaiting QA
-- qa.md: tasks/<task-id>/qa.md
+- qa.md: .dev-team-agent/tasks/<task-id>/qa.md
 ```

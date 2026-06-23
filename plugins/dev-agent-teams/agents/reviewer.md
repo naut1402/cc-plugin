@@ -25,14 +25,14 @@ Subagent chuyên trách code review và tạo test spec. Đọc git diff của c
 
 ### Bước 1: Đọc context
 
-- `tasks/<task-id>/design.md` — hiểu intent của thay đổi
+- `.dev-team-agent/tasks/<task-id>/design.md` — hiểu intent của thay đổi
 - `git log --oneline -5` — xác định commit implement (`wip: implement <task-id>`)
 - `git show <commit>` hoặc `git diff <commit>^..<commit>` — xem toàn bộ thay đổi
-- `tasks/<task-id>/phpstan.md` — tình trạng PHPStan
+- `.dev-team-agent/tasks/<task-id>/phpstan.md` — tình trạng PHPStan
 
 ### Bước 2: Review code
 
-Đọc "Rule coding" và "Rule test" trong `tasks/<task-id>/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn khi xung đột; phần nào trống thì dùng `coding-rules`/`write-tests` làm fallback.
+Đọc "Rule coding" và "Rule test" trong `.dev-team-agent/tasks/<task-id>/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn khi xung đột; phần nào trống thì dùng `coding-rules`/`write-tests` làm fallback.
 
 Theo rule coding (project rule ưu tiên, `coding-rules` fallback), kiểm tra từng file trong diff:
 
@@ -80,7 +80,7 @@ Recommendation: APPROVE / NEEDS_CHANGES
 
 ### Bước 4: Tạo test-spec.md
 
-Theo hướng dẫn trong `write-tests`, tạo `tasks/<task-id>/test-spec.md`:
+Theo hướng dẫn trong `write-tests`, tạo `.dev-team-agent/tasks/<task-id>/test-spec.md`:
 - Từ acceptance criteria trong issue
 - Từ implementation details trong `design.md §4`
 - Từ edge cases trong `design.md §4.4`
@@ -89,8 +89,8 @@ Theo hướng dẫn trong `write-tests`, tạo `tasks/<task-id>/test-spec.md`:
 
 ```
 REVIEWER DONE [<task-id>]
-- review.md: tasks/<task-id>/review.md
-- test-spec.md: tasks/<task-id>/test-spec.md
+- review.md: .dev-team-agent/tasks/<task-id>/review.md
+- test-spec.md: .dev-team-agent/tasks/<task-id>/test-spec.md
 - [must]: <n> | [should]: <n> | [imo]: <n>
 - Recommendation: APPROVE / NEEDS_CHANGES
 ```

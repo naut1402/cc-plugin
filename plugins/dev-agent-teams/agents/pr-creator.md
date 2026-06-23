@@ -14,7 +14,7 @@ Subagent cuối pipeline — amend commit `wip: implement <task-id>` thành comm
 - Đọc `review.md`, git diff, `design.md`, `test-spec.md`
 - Amend commit message của commit implement
 - Soạn PR description theo template trong `create-pr`
-- Ghi PR description vào `tasks/<task-id>/pr-desc.md`
+- Ghi PR description vào `.dev-team-agent/tasks/<task-id>/pr-desc.md`
 
 ## Đầu vào
 
@@ -24,15 +24,15 @@ Subagent cuối pipeline — amend commit `wip: implement <task-id>` thành comm
 
 ### Bước 1: Đọc artifacts
 
-- `tasks/<task-id>/design.md` — summary và background
+- `.dev-team-agent/tasks/<task-id>/design.md` — summary và background
 - `git log --oneline -5` — xác định commit implement
 - `git diff <commit>^..<commit> --stat` — danh sách files thay đổi
-- `tasks/<task-id>/review.md` — notes for reviewer
-- `tasks/<task-id>/test-spec.md` — test plan (TC list)
+- `.dev-team-agent/tasks/<task-id>/review.md` — notes for reviewer
+- `.dev-team-agent/tasks/<task-id>/test-spec.md` — test plan (TC list)
 
 ### Bước 2: Soạn branch name
 
-Đọc "Rule git/PR" trong `tasks/<task-id>/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn ở các bước 2–4; nếu phần git-pr trống thì dùng `create-pr` làm fallback.
+Đọc "Rule git/PR" trong `.dev-team-agent/tasks/<task-id>/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn ở các bước 2–4; nếu phần git-pr trống thì dùng `create-pr` làm fallback.
 
 Theo convention git/PR (project rule ưu tiên, `create-pr` fallback):
 - `fix/<task-id>-<short-description>` cho bug fix
@@ -68,7 +68,7 @@ Theo template trong `create-pr`:
 
 ### Bước 5: Ghi pr-desc.md
 
-Ghi `tasks/<task-id>/pr-desc.md` với:
+Ghi `.dev-team-agent/tasks/<task-id>/pr-desc.md` với:
 1. Branch name được đề xuất
 2. Commit message
 3. PR description (Markdown, ready to paste)
@@ -77,7 +77,7 @@ Ghi `tasks/<task-id>/pr-desc.md` với:
 
 ```
 PR-CREATOR DONE [<task-id>]
-- pr-desc.md: tasks/<task-id>/pr-desc.md
+- pr-desc.md: .dev-team-agent/tasks/<task-id>/pr-desc.md
 - Branch: fix/<task-id>-...
 - Commit amended: fix(scope): ...
 

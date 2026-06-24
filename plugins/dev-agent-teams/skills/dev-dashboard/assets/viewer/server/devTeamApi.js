@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
+import yaml from 'js-yaml'
 
 // Vite plugin: exposes a tiny read-only API over the `.dev-team-agent/` data
 // root so the dashboard can render orchestrator state without a separate server
@@ -8,23 +9,104 @@ import path from 'node:path'
 //
 //   GET /api/tasks                  → all tasks with state + artifact metadata + qa
 //   GET /api/artifact?id=..&name=.. → raw text of one artifact (markdown)
+//   GET /api/pipeline-config?id=..  → resolved pipeline config (built-in ← global ← per-task)
 //   GET /api/pipeline-export?id=..  → structured phase-summary JSON (machine-readable)
 //   GET /api/profile                → orchestrator flow profile (future: editable)
 //   POST /api/profile               → persist profile (stub)
 
-// Artifacts we know how to map onto pipeline phases. Anything else found in a
-// task directory is still surfaced under "other" so nothing is hidden.
-const KNOWN_ARTIFACTS = [
-  'investigate.md',
-  'investigate-po.md',
-  'design.md',
-  'design-po.md',
-  'phpstan.md',
-  'review.md',
-  'test-spec.md',
-  'pr-desc.md',
-  'qa.md',
-]
+// Last-resort fallback when NO pipeline.yaml exists anywhere (rare: /dev-dashboard
+// setup always scaffolds .dev-team-agent/pipeline.yaml). The canonical source of
+// the default flow is dev-team-orchestrator/assets/pipeline.default.yaml — this
+// JS literal is a self-contained copy because the viewer is copied out of the
+// plugin tree into the project and can't read that asset at runtime. Keep the two
+// in sync (only the structure matters here; comments live in the YAML).
+const DEFAULT_PIPELINE = {
+  version: 1,
+  defaults: { review_retry_max: 2, auto_review: false, export_json: false },
+  steps: [
+    { id: 'investigator', name: 'Investigate', agent: 'dev-agent-teams:investigator', produces: ['investigate.md'], export_key: 'investigator', hitl: { mode: 'manual', gate_id: 'hitl-1', optional_doc_review: true } },
+    { id: 'designer', name: 'Design', agent: 'dev-agent-teams:designer', produces: ['design.md'], export_key: 'designer', hitl: { mode: 'manual', gate_id: 'hitl-2', optional_doc_review: true } },
+    { id: 'implementer', name: 'Implement', agent: 'dev-agent-teams:implementer', produces: ['phpstan.md'], export_key: 'implementer', hitl: { mode: 'none' } },
+    { id: 'reviewer', name: 'Review', agent: 'dev-agent-teams:reviewer', produces: ['review.md', 'test-spec.md'], export_key: 'reviewer', hitl: { mode: 'manual', gate_id: 'hitl-3', blocking: true, retry: { on: 'must_fix', restart_from: 'implementer', max: 2 } } },
+    { id: 'pr-creator', name: 'PR', agent: 'dev-agent-teams:pr-creator', produces: ['pr-desc.md'], export_key: 'pr_creator', hitl: { mode: 'none' } },
+  ],
+  doc_reviewer: { agent: 'dev-agent-teams:doc-reviewer', skills: ['doc-review'], rule_category: 'doc-review', rule_required: true },
+}
+
+// Merge one step's fields onto a base step (one level deep for `hitl`).
+function mergeStep(base, patch) {
+  const out = { ...base, ...patch }
+  if (base.hitl || patch.hitl) out.hitl = { ...(base.hitl || {}), ...(patch.hitl || {}) }
+  return out
+}
+
+// Per-task patch: override by `id`, append new ids, drop on `remove: true`.
+function patchSteps(baseSteps, patch) {
+  const out = baseSteps.map((s) => ({ ...s }))
+  for (const p of patch) {
+    const idx = out.findIndex((s) => s.id === p.id)
+    if (p.remove) {
+      if (idx >= 0) out.splice(idx, 1)
+      continue
+    }
+    if (idx >= 0) out[idx] = mergeStep(out[idx], p)
+    else out.push(p)
+  }
+  return out
+}
+
+async function readYamlSafe(p) {
+  try {
+    const raw = await fs.readFile(p, 'utf8')
+    const doc = yaml.load(raw)
+    return doc && typeof doc === 'object' ? doc : null
+  } catch {
+    return null
+  }
+}
+
+// Resolve pipeline config: built-in default ← global pipeline.yaml (full step
+// replace) ← per-task tasks/<id>/pipeline.yaml (patch by id).
+async function loadPipelineConfig(root, id) {
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_PIPELINE))
+  let source = 'builtin'
+
+  const global = await readYamlSafe(path.join(root, 'pipeline.yaml'))
+  if (global) {
+    if (Array.isArray(global.steps)) cfg.steps = global.steps
+    if (global.defaults) cfg.defaults = { ...cfg.defaults, ...global.defaults }
+    if (global.doc_reviewer) cfg.doc_reviewer = { ...cfg.doc_reviewer, ...global.doc_reviewer }
+    if (global.version != null) cfg.version = global.version
+    source = 'global'
+  }
+
+  if (id) {
+    const per = await readYamlSafe(path.join(root, 'tasks', id, 'pipeline.yaml'))
+    if (per) {
+      if (Array.isArray(per.steps)) cfg.steps = patchSteps(cfg.steps, per.steps)
+      if (per.defaults) cfg.defaults = { ...cfg.defaults, ...per.defaults }
+      if (per.doc_reviewer) cfg.doc_reviewer = { ...cfg.doc_reviewer, ...per.doc_reviewer }
+      source = source === 'global' ? 'global+task' : 'task'
+    }
+  }
+
+  cfg.source = source
+  return cfg
+}
+
+// Artifacts a pipeline config produces, plus always-present sidecar files
+// (qa.md, and *-po.md doc-review outputs for any *.md artifact).
+function knownArtifactsFor(cfg) {
+  const set = new Set(['qa.md'])
+  for (const step of cfg.steps || []) {
+    for (const a of step.produces || []) {
+      set.add(a)
+      const m = /^(.*)\.md$/.exec(a)
+      if (m) set.add(`${m[1]}-po.md`)
+    }
+  }
+  return [...set]
+}
 
 function json(res, status, body) {
   const payload = JSON.stringify(body)
@@ -46,7 +128,7 @@ async function statSafe(p) {
 // pipeline-export.json is machine-readable only — excluded from the UI artifact list.
 const MACHINE_FILES = new Set(['pipeline-export.json'])
 
-async function listArtifacts(taskDir) {
+async function listArtifacts(taskDir, knownArtifacts) {
   const out = {}
   let entries = []
   try {
@@ -67,7 +149,7 @@ async function listArtifacts(taskDir) {
     }
   }
   // Ensure known artifacts always appear (as not-yet-created) for a stable UI.
-  for (const name of KNOWN_ARTIFACTS) {
+  for (const name of knownArtifacts) {
     if (!(name in out)) out[name] = { exists: false, mtime: null, size: 0 }
   }
   return { artifacts: out, subtasks }
@@ -113,7 +195,8 @@ async function collectTasks(root) {
       : { ok: false, state: null, error: 'no state file' }
 
     const taskDir = path.join(tasksDir, id)
-    const { artifacts, subtasks } = await listArtifacts(taskDir)
+    const cfg = await loadPipelineConfig(root, id)
+    const { artifacts, subtasks } = await listArtifacts(taskDir, knownArtifactsFor(cfg))
 
     let qa = null
     let qa_count = 0
@@ -144,6 +227,7 @@ async function collectTasks(root) {
       export_json: state?.export_json ?? false,
       artifacts,
       subtasks,
+      pipeline: cfg,
       has_qa: !!(artifacts['qa.md'] && artifacts['qa.md'].exists),
       qa_count,
       qa,
@@ -183,6 +267,13 @@ export function devTeamApi({ root }) {
         try {
           if (url.pathname === '/api/tasks' && req.method === 'GET') {
             return json(res, 200, { root, tasks: await collectTasks(root) })
+          }
+
+          // Resolved pipeline config for a task (or global when no id).
+          if (url.pathname === '/api/pipeline-config' && req.method === 'GET') {
+            const id = url.searchParams.get('id') || ''
+            const cfg = await loadPipelineConfig(root, id || null)
+            return json(res, 200, { id: id || null, pipeline: cfg })
           }
 
           if (url.pathname === '/api/artifact' && req.method === 'GET') {

@@ -2,7 +2,7 @@
 import { ref, computed, watch, markRaw } from 'vue'
 import { VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
-import { PHASES, phaseStatus, fetchFlowProfile, saveFlowProfile } from '../api.js'
+import { phasesFromPipeline, phaseStatus, fetchFlowProfile, saveFlowProfile } from '../api.js'
 import PipelineNode from './PipelineNode.vue'
 
 const props = defineProps({
@@ -28,14 +28,24 @@ watch(() => props.task.task_id, () => {
   loadProfile()
 }, { immediate: true })
 
-// Resolve phases: custom profile overrides default.
-const phases = computed(() => {
-  if (customProfile.value?.phases?.length) return customProfile.value.phases
-  return PHASES
-})
-
 const NODE_SPACING = 200
 const NODE_Y = 40
+
+// Phases come from the task's resolved pipeline config (built-in ← global ←
+// per-task), embedded in /api/tasks. A saved flow profile only contributes node
+// positions (x/y), overlaid by key — it no longer redefines the phase list.
+const phases = computed(() => {
+  const base = phasesFromPipeline(props.task.pipeline)
+  const pos = {}
+  for (const p of customProfile.value?.phases ?? []) {
+    if (p.x != null || p.y != null) pos[p.key] = { x: p.x, y: p.y }
+  }
+  return base.map((p, i) => ({
+    ...p,
+    x: pos[p.key]?.x ?? i * NODE_SPACING,
+    y: pos[p.key]?.y ?? NODE_Y,
+  }))
+})
 
 const nodes = computed(() =>
   phases.value.map((p, i) => {
@@ -71,15 +81,14 @@ const edges = computed(() =>
   }),
 )
 
-// Persist node positions when user drags them.
+// Persist node positions when user drags them. Positions are keyed by phase id
+// and overlaid onto the config-derived phase list.
 function onNodeDragStop({ node }) {
-  const base = customProfile.value ?? {
-    phases: PHASES.map((p, i) => ({ ...p, x: i * NODE_SPACING, y: NODE_Y })),
-  }
   const updated = {
-    ...base,
-    phases: base.phases.map((p) =>
-      p.key === node.id ? { ...p, x: Math.round(node.position.x), y: Math.round(node.position.y) } : p,
+    phases: phases.value.map((p) =>
+      p.key === node.id
+        ? { key: p.key, x: Math.round(node.position.x), y: Math.round(node.position.y) }
+        : { key: p.key, x: p.x, y: p.y },
     ),
   }
   saveFlowProfile(props.task.task_id, updated).then(() => {
@@ -95,7 +104,7 @@ const saving = ref(false)
 
 function openEditor() {
   const profile = customProfile.value ?? {
-    phases: PHASES.map((p, i) => ({ ...p, x: i * NODE_SPACING, y: NODE_Y })),
+    phases: phases.value.map((p) => ({ key: p.key, x: p.x, y: p.y })),
   }
   editorJson.value = JSON.stringify(profile, null, 2)
   editorError.value = ''
@@ -126,7 +135,9 @@ async function saveProfile() {
 async function resetProfile() {
   saving.value = true
   try {
-    const defaultProfile = { phases: PHASES.map((p, i) => ({ ...p, x: i * NODE_SPACING, y: NODE_Y })) }
+    const defaultProfile = {
+      phases: phasesFromPipeline(props.task.pipeline).map((p, i) => ({ key: p.key, x: i * NODE_SPACING, y: NODE_Y })),
+    }
     await saveFlowProfile(props.task.task_id, defaultProfile)
     customProfile.value = null
     editorOpen.value = false
@@ -161,8 +172,9 @@ async function resetProfile() {
     </div>
 
     <section class="meta-row">
-      <span class="chip">doc-review investigate: {{ task.doc_review_round?.investigate ?? 0 }}</span>
-      <span class="chip">doc-review design: {{ task.doc_review_round?.design ?? 0 }}</span>
+      <span v-for="(n, doc) in (task.doc_review_round || {})" :key="doc" class="chip">
+        doc-review {{ doc }}: {{ n }}
+      </span>
       <span v-if="task.inherit_from_parent?.length" class="chip">
         kế thừa: {{ task.inherit_from_parent.join(', ') }}
       </span>

@@ -18,6 +18,13 @@ export async function fetchPipelineExport(id) {
   return r.json()
 }
 
+export async function fetchPipelineConfig(id) {
+  const q = id ? `?id=${encodeURIComponent(id)}` : ''
+  const r = await fetch(`/api/pipeline-config${q}`)
+  if (!r.ok) throw new Error(`/api/pipeline-config → ${r.status}`)
+  return r.json()
+}
+
 export async function fetchFlowProfile(id) {
   const r = await fetch(`/api/flow-profile?id=${encodeURIComponent(id)}`)
   if (!r.ok) throw new Error(`/api/flow-profile → ${r.status}`)
@@ -34,8 +41,10 @@ export async function saveFlowProfile(id, profile) {
   return r.json()
 }
 
-// Pipeline definition shared by the UI. Order matters — it's the left→right
-// flow. `hitl` is the gate that follows the phase (if any).
+// Fallback pipeline shape used only when a task has no resolved config (e.g.
+// fetch error). Normally phases come from the per-task pipeline config embedded
+// in /api/tasks (see phasesFromPipeline). Order = left→right flow; `hitl` is the
+// gate that follows the phase.
 export const PHASES = [
   { key: 'investigator', label: 'Investigate', artifact: 'investigate.md', hitl: 'hitl-1' },
   { key: 'designer', label: 'Design', artifact: 'design.md', hitl: 'hitl-2' },
@@ -43,6 +52,20 @@ export const PHASES = [
   { key: 'reviewer', label: 'Review', artifact: 'review.md', hitl: 'hitl-3' },
   { key: 'pr-creator', label: 'PR', artifact: 'pr-desc.md', hitl: null },
 ]
+
+// Map a resolved pipeline config (steps[]) onto the UI phase shape. `artifact`
+// is the first produced file (used to infer "done"); `hitl` is the gate id that
+// follows the step, if any.
+export function phasesFromPipeline(pipeline) {
+  const steps = pipeline?.steps
+  if (!Array.isArray(steps) || !steps.length) return PHASES
+  return steps.map((s) => ({
+    key: s.id,
+    label: s.name || s.id,
+    artifact: (s.produces && s.produces[0]) || null,
+    hitl: s.hitl?.gate_id ?? null,
+  }))
+}
 
 // Derive a display status for a phase from artifacts + live state. The
 // orchestrator's own rule is "status is inferred from artifact existence, not

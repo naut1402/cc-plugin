@@ -39,6 +39,22 @@ for (const dir of ['tasks', '.dev-state']) {
   }
 }
 
+// 2b. Scaffold a default pipeline.yaml (idempotent — never clobber an edited one).
+//     Reads the canonical asset that the orchestrator + /init-dev-pipeline also
+//     use, so there is one source of truth the user can then customise.
+const pipelinePath = path.join(dta, 'pipeline.yaml')
+const defaultPipelineAsset = path.resolve(
+  __dirname,
+  '../../dev-team-orchestrator/assets/pipeline.default.yaml',
+)
+const DEFAULT_PIPELINE_YAML = fs.readFileSync(defaultPipelineAsset, 'utf8')
+if (fs.existsSync(pipelinePath)) {
+  log('pipeline.yaml already exists — skipped')
+} else {
+  fs.writeFileSync(pipelinePath, DEFAULT_PIPELINE_YAML)
+  log('scaffolded default pipeline.yaml → .dev-team-agent/pipeline.yaml')
+}
+
 // 3. Copy viewer, never clobbering an installed node_modules.
 fs.cpSync(viewerSrc, viewerDst, {
   recursive: true,

@@ -178,7 +178,13 @@ function applyDraft(newDraft) {
         @update:model-value="draft.workflow_steps = $event"
       />
 
-      <AgentSectionEditor :draft="draft" :catalog="catalog" @update:draft="draft = $event" />
+      <AgentSectionEditor
+        :draft="draft"
+        :catalog="catalog"
+        @update:draft="draft = $event"
+        @message="message = $event; error = ''"
+        @error="error = $event; message = ''"
+      />
     </div>
   </div>
 </template>

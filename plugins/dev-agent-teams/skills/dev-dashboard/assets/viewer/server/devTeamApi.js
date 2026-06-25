@@ -7,6 +7,7 @@ import {
   compileAgentMarkdown,
   heuristicDraftFromDescription,
   emptyDraft,
+  draftFromAgentMarkdown,
 } from '../src/lib/agentMarkdown.js'
 
 // ── Catalog helpers ──────────────────────────────────────────────────────────
@@ -392,6 +393,71 @@ async function buildCatalog(root) {
   }
 
   return { skills, agents }
+}
+
+function parseCatalogAgentId(id) {
+  if (typeof id !== 'string' || !id.includes(':')) return null
+  const i = id.lastIndexOf(':')
+  if (i <= 0) return null
+  return { source: id.slice(0, i), name: id.slice(i + 1) }
+}
+
+async function latestPluginCacheDir(pluginName) {
+  const cacheRoot = path.join(homeDir(), '.claude', 'plugins', 'cache')
+  for (const market of await safeReadDir(cacheRoot)) {
+    if (!market.isDirectory()) continue
+    const pluginPath = path.join(cacheRoot, market.name, pluginName)
+    const versions = (await safeReadDir(pluginPath)).filter((e) => e.isDirectory())
+    if (!versions.length) continue
+    let latestDir = versions[0].name
+    let latestMtime = 0
+    for (const v of versions) {
+      const meta = await statSafe(path.join(pluginPath, v.name))
+      if (meta.mtime > latestMtime) {
+        latestMtime = meta.mtime
+        latestDir = v.name
+      }
+    }
+    return path.join(pluginPath, latestDir)
+  }
+  return null
+}
+
+async function resolveCatalogAgentPath(projectRoot, root, id) {
+  const parsed = parseCatalogAgentId(id)
+  if (!parsed?.name) return null
+  const { source, name } = parsed
+  const fileName = `${name}.md`
+
+  if (source === 'dashboard') {
+    return path.join(customAgentsDir(root), fileName)
+  }
+  if (source === 'user') {
+    return path.join(homeDir(), '.claude', 'agents', fileName)
+  }
+  if (source === 'project') {
+    return path.join(projectRoot, '.claude', 'agents', fileName)
+  }
+  if (source.startsWith('repo:')) {
+    const pluginName = source.slice('repo:'.length)
+    const found = await findMarketplaceJson(projectRoot)
+    if (!found) return null
+    const plugins = Array.isArray(found.data.plugins) ? found.data.plugins : []
+    const hit = plugins.find((p) => (p.name || path.basename(p.source)) === pluginName)
+    if (!hit?.source) return null
+    return path.join(path.resolve(found.dir, hit.source), 'agents', fileName)
+  }
+  if (source.startsWith('plugin:')) {
+    const pluginName = source.slice('plugin:'.length)
+    const installs = await loadEnabledPluginInstalls()
+    const install = installs.find((i) => i.name === pluginName)
+    if (install?.installPath) {
+      return path.join(install.installPath, 'agents', fileName)
+    }
+    const cacheDir = await latestPluginCacheDir(pluginName)
+    if (cacheDir) return path.join(cacheDir, 'agents', fileName)
+  }
+  return null
 }
 
 // ── Rules helpers ────────────────────────────────────────────────────────────
@@ -968,6 +1034,47 @@ export function devTeamApi({ root }) {
           if (url.pathname === '/api/catalog' && req.method === 'GET') {
             const catalog = await buildCatalog(root)
             return json(res, 200, catalog)
+          }
+
+          if (url.pathname === '/api/catalog-agent' && req.method === 'GET') {
+            const id = url.searchParams.get('id')
+            if (!id) return json(res, 400, { error: 'missing id' })
+            const projectRoot = path.dirname(root)
+            let agentPath = await resolveCatalogAgentPath(projectRoot, root, id)
+            if (!agentPath) {
+              const parsed = parseCatalogAgentId(id)
+              if (parsed?.source?.startsWith('repo:')) {
+                const pluginName = parsed.source.slice('repo:'.length)
+                const builtin = path.join(
+                  projectRoot,
+                  'plugins',
+                  pluginName,
+                  'agents',
+                  `${parsed.name}.md`,
+                )
+                try {
+                  await fs.access(builtin)
+                  agentPath = builtin
+                } catch {
+                  /* not found */
+                }
+              }
+            }
+            if (!agentPath) return json(res, 404, { error: 'agent file not found' })
+            try {
+              const raw = await fs.readFile(agentPath, 'utf8')
+              const meta = parseCatalogAgentId(id)
+              const draft = draftFromAgentMarkdown(raw, yaml, {
+                name: meta?.name,
+                description: '',
+              })
+              const fm = parseFrontmatter(raw)
+              if (fm.description) draft.description = fm.description
+              if (Array.isArray(fm.skills) && fm.skills.length) draft.skills = [...fm.skills]
+              return json(res, 200, { id, path: agentPath, content: raw, draft })
+            } catch (e) {
+              return json(res, 500, { error: String(e.message || e) })
+            }
           }
 
           if (url.pathname === '/api/rules' && req.method === 'GET') {

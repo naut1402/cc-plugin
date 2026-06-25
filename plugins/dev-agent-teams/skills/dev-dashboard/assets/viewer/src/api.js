@@ -47,6 +47,12 @@ export async function fetchCatalog() {
   return r.json()
 }
 
+export async function fetchCatalogAgent(id) {
+  const r = await fetch(`/api/catalog-agent?id=${encodeURIComponent(id)}`)
+  if (!r.ok) throw new Error(`/api/catalog-agent → ${r.status}`)
+  return r.json()
+}
+
 export async function fetchRules() {
   const r = await fetch('/api/rules')
   if (!r.ok) throw new Error(`/api/rules → ${r.status}`)

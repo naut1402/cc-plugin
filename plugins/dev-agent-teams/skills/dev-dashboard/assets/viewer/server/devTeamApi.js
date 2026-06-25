@@ -3,6 +3,158 @@ import fsSync from 'node:fs'
 import path from 'node:path'
 import yaml from 'js-yaml'
 
+// ── Catalog helpers ──────────────────────────────────────────────────────────
+
+// Parse YAML frontmatter from a markdown file (content between first --- fences).
+function parseFrontmatter(raw) {
+  const lines = raw.split('\n')
+  if (lines[0].trim() !== '---') return {}
+  const end = lines.indexOf('---', 1)
+  if (end < 0) return {}
+  try {
+    return yaml.load(lines.slice(1, end).join('\n')) || {}
+  } catch {
+    return {}
+  }
+}
+
+// Walk up from `startDir` looking for `.claude-plugin/marketplace.json`.
+async function findMarketplaceJson(startDir) {
+  let dir = startDir
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.join(dir, '.claude-plugin', 'marketplace.json')
+    try {
+      const raw = await fs.readFile(candidate, 'utf8')
+      return { file: candidate, dir, data: JSON.parse(raw) }
+    } catch {
+      const parent = path.dirname(dir)
+      if (parent === dir) break
+      dir = parent
+    }
+  }
+  return null
+}
+
+// Scan a plugin source directory for SKILL.md files and agent .md files.
+async function scanPlugin(pluginDir) {
+  const pluginName = path.basename(pluginDir)
+  const skills = []
+  const agents = []
+
+  // Skills: plugins/<name>/skills/*/SKILL.md
+  const skillsDir = path.join(pluginDir, 'skills')
+  try {
+    for (const entry of await fs.readdir(skillsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      const skillMd = path.join(skillsDir, entry.name, 'SKILL.md')
+      try {
+        const raw = await fs.readFile(skillMd, 'utf8')
+        const fm = parseFrontmatter(raw)
+        if (!fm.name) continue
+        // Skip contract skills (user-invocable: false)
+        if (fm['user-invocable'] === false) continue
+        skills.push({
+          id: `${pluginName}:${fm.name}`,
+          name: fm.name,
+          plugin: pluginName,
+          description: (fm.description || '').slice(0, 140),
+        })
+      } catch {
+        /* skip missing files */
+      }
+    }
+  } catch {
+    /* no skills dir */
+  }
+
+  // Agents: plugins/<name>/agents/*.md
+  const agentsDir = path.join(pluginDir, 'agents')
+  try {
+    for (const entry of await fs.readdir(agentsDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.md')) continue
+      const agentName = entry.name.replace(/\.md$/, '')
+      try {
+        const raw = await fs.readFile(path.join(agentsDir, entry.name), 'utf8')
+        const fm = parseFrontmatter(raw)
+        agents.push({
+          id: `${pluginName}:${agentName}`,
+          name: agentName,
+          plugin: pluginName,
+          description: (fm.description || '').slice(0, 140),
+          skills: Array.isArray(fm.skills) ? fm.skills : [],
+        })
+      } catch {
+        /* skip */
+      }
+    }
+  } catch {
+    /* no agents dir */
+  }
+
+  return { skills, agents }
+}
+
+// Built-in fallback catalog when marketplace.json is not found.
+const BUILTIN_CATALOG = {
+  skills: [
+    { id: 'dev-agent-teams:survey-codebase', name: 'survey-codebase', plugin: 'dev-agent-teams', description: 'Survey codebase, trace call chains' },
+    { id: 'dev-agent-teams:write-design', name: 'write-design', plugin: 'dev-agent-teams', description: 'Write design documentation' },
+    { id: 'dev-agent-teams:coding-rules', name: 'coding-rules', plugin: 'dev-agent-teams', description: 'Apply coding conventions' },
+    { id: 'dev-agent-teams:run-phpstan', name: 'run-phpstan', plugin: 'dev-agent-teams', description: 'Run PHPStan static analysis' },
+    { id: 'dev-agent-teams:write-tests', name: 'write-tests', plugin: 'dev-agent-teams', description: 'Write test specifications' },
+    { id: 'dev-agent-teams:create-pr', name: 'create-pr', plugin: 'dev-agent-teams', description: 'Create pull request' },
+    { id: 'dev-agent-teams:doc-review', name: 'doc-review', plugin: 'dev-agent-teams', description: 'Review documentation quality' },
+  ],
+  agents: [
+    { id: 'dev-agent-teams:investigator', name: 'investigator', plugin: 'dev-agent-teams', description: 'Survey codebase, trace call chains from entry point', skills: ['survey-codebase'] },
+    { id: 'dev-agent-teams:designer', name: 'designer', plugin: 'dev-agent-teams', description: 'Write design documentation', skills: ['write-design'] },
+    { id: 'dev-agent-teams:implementer', name: 'implementer', plugin: 'dev-agent-teams', description: 'Implement code changes, run PHPStan', skills: ['coding-rules', 'run-phpstan'] },
+    { id: 'dev-agent-teams:reviewer', name: 'reviewer', plugin: 'dev-agent-teams', description: 'Review code quality, create test spec', skills: ['coding-rules', 'write-tests'] },
+    { id: 'dev-agent-teams:pr-creator', name: 'pr-creator', plugin: 'dev-agent-teams', description: 'Create PR description, amend commit', skills: ['create-pr'] },
+    { id: 'dev-agent-teams:doc-reviewer', name: 'doc-reviewer', plugin: 'dev-agent-teams', description: 'Review document quality', skills: ['doc-review'] },
+  ],
+}
+
+async function buildCatalog(root) {
+  // Find marketplace.json relative to the project root (parent of .dev-team-agent/).
+  const projectRoot = path.dirname(root)
+  const found = await findMarketplaceJson(projectRoot)
+  if (!found) return BUILTIN_CATALOG
+
+  const allSkills = []
+  const allAgents = []
+  const plugins = Array.isArray(found.data.plugins) ? found.data.plugins : []
+  for (const p of plugins) {
+    if (!p.source) continue
+    const pluginDir = path.resolve(found.dir, p.source)
+    try {
+      const { skills, agents } = await scanPlugin(pluginDir)
+      allSkills.push(...skills)
+      allAgents.push(...agents)
+    } catch {
+      /* skip inaccessible plugin */
+    }
+  }
+  return {
+    skills: allSkills.length ? allSkills : BUILTIN_CATALOG.skills,
+    agents: allAgents.length ? allAgents : BUILTIN_CATALOG.agents,
+  }
+}
+
+// ── Profile helpers ──────────────────────────────────────────────────────────
+
+function profilesDir(root) {
+  return path.join(root, 'pipeline-profiles')
+}
+
+function sanitiseProfileName(name) {
+  if (typeof name !== 'string' || !name.trim()) return null
+  // Reject names containing path separators or null bytes.
+  if (/[\\/\0]/.test(name)) return null
+  const clean = name.trim().replace(/[^a-zA-Z0-9_\-. ]/g, '').slice(0, 64)
+  return clean || null
+}
+
 // Vite plugin: exposes a tiny read-only API over the `.dev-team-agent/` data
 // root so the dashboard can render orchestrator state without a separate server
 // process. Everything is filesystem-backed; the frontend polls for realtime.
@@ -346,6 +498,98 @@ export function devTeamApi({ root }) {
               await fs.writeFile(fp, JSON.stringify(parsed, null, 2), 'utf8')
               return json(res, 200, { id, saved: true })
             }
+          }
+
+          // ── Catalog: available skills & agents from installed plugins ──────
+          if (url.pathname === '/api/catalog' && req.method === 'GET') {
+            const catalog = await buildCatalog(root)
+            return json(res, 200, catalog)
+          }
+
+          // ── Pipeline profiles: named reusable pipeline configs ────────────
+          if (url.pathname === '/api/pipeline-profiles') {
+            const dir = profilesDir(root)
+
+            if (req.method === 'GET') {
+              // ?name=<n> → return one profile's pipeline content
+              const nameParam = url.searchParams.get('name')
+              if (nameParam) {
+                const name = sanitiseProfileName(nameParam)
+                if (!name) return json(res, 400, { error: 'invalid profile name' })
+                try {
+                  const raw = await fs.readFile(path.join(dir, `${name}.yaml`), 'utf8')
+                  const pipeline = yaml.load(raw)
+                  return json(res, 200, { name, pipeline })
+                } catch {
+                  return json(res, 404, { error: 'profile not found' })
+                }
+              }
+              // No ?name → list all profiles
+              try {
+                const files = (await fs.readdir(dir)).filter((f) => f.endsWith('.yaml'))
+                const profiles = await Promise.all(
+                  files.map(async (f) => {
+                    const s = await statSafe(path.join(dir, f))
+                    return { name: f.replace(/\.yaml$/, ''), mtime: s.mtime }
+                  }),
+                )
+                return json(res, 200, { profiles })
+              } catch {
+                return json(res, 200, { profiles: [] })
+              }
+            }
+
+            if (req.method === 'POST') {
+              let body = ''
+              for await (const chunk of req) body += chunk
+              let parsed
+              try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+              const name = sanitiseProfileName(parsed.name)
+              if (!name) return json(res, 400, { error: 'invalid profile name' })
+              if (!parsed.pipeline || !Array.isArray(parsed.pipeline.steps)) {
+                return json(res, 400, { error: 'pipeline.steps must be an array' })
+              }
+              await fs.mkdir(dir, { recursive: true })
+              await fs.writeFile(path.join(dir, `${name}.yaml`), yaml.dump(parsed.pipeline, { lineWidth: 120 }), 'utf8')
+              return json(res, 200, { saved: true, name })
+            }
+
+            if (req.method === 'DELETE') {
+              const name = sanitiseProfileName(url.searchParams.get('name') || '')
+              if (!name) return json(res, 400, { error: 'invalid profile name' })
+              try {
+                await fs.unlink(path.join(dir, `${name}.yaml`))
+                return json(res, 200, { deleted: true, name })
+              } catch {
+                return json(res, 404, { error: 'profile not found' })
+              }
+            }
+          }
+
+          // ── Pipeline config write: save global or per-task pipeline.yaml ──
+          if (url.pathname === '/api/pipeline-config-write' && req.method === 'POST') {
+            let body = ''
+            for await (const chunk of req) body += chunk
+            let parsed
+            try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+            const { scope, taskId, pipeline } = parsed
+            if (!pipeline || !Array.isArray(pipeline.steps)) {
+              return json(res, 400, { error: 'pipeline.steps must be an array' })
+            }
+            let target
+            if (scope === 'global') {
+              target = path.join(root, 'pipeline.yaml')
+            } else if (scope === 'task' && taskId) {
+              // Sanitise taskId — only allow alphanumeric and hyphens/underscores
+              if (/[^\w\-]/.test(taskId)) return json(res, 400, { error: 'invalid taskId' })
+              const taskDir = path.join(root, 'tasks', taskId)
+              await fs.mkdir(taskDir, { recursive: true })
+              target = path.join(taskDir, 'pipeline.yaml')
+            } else {
+              return json(res, 400, { error: 'scope must be "global" or "task" (with taskId)' })
+            }
+            await fs.writeFile(target, yaml.dump(pipeline, { lineWidth: 120 }), 'utf8')
+            return json(res, 200, { written: true, scope, target })
           }
 
           return json(res, 404, { error: 'unknown endpoint' })

@@ -41,6 +41,50 @@ export async function saveFlowProfile(id, profile) {
   return r.json()
 }
 
+export async function fetchCatalog() {
+  const r = await fetch('/api/catalog')
+  if (!r.ok) throw new Error(`/api/catalog → ${r.status}`)
+  return r.json()
+}
+
+export async function fetchPipelineProfiles() {
+  const r = await fetch('/api/pipeline-profiles')
+  if (!r.ok) throw new Error(`/api/pipeline-profiles → ${r.status}`)
+  return r.json()
+}
+
+export async function fetchPipelineProfile(name) {
+  const r = await fetch(`/api/pipeline-profiles?name=${encodeURIComponent(name)}`)
+  if (!r.ok) throw new Error(`/api/pipeline-profiles?name=${name} → ${r.status}`)
+  return r.json()
+}
+
+export async function savePipelineProfile(name, pipeline) {
+  const r = await fetch('/api/pipeline-profiles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, pipeline }),
+  })
+  if (!r.ok) throw new Error(`/api/pipeline-profiles POST → ${r.status}`)
+  return r.json()
+}
+
+export async function deletePipelineProfile(name) {
+  const r = await fetch(`/api/pipeline-profiles?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(`/api/pipeline-profiles DELETE → ${r.status}`)
+  return r.json()
+}
+
+export async function writePipelineConfig(scope, pipeline, taskId) {
+  const r = await fetch('/api/pipeline-config-write', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scope, pipeline, taskId }),
+  })
+  if (!r.ok) throw new Error(`/api/pipeline-config-write → ${r.status}`)
+  return r.json()
+}
+
 // Fallback pipeline shape used only when a task has no resolved config (e.g.
 // fetch error). Normally phases come from the per-task pipeline config embedded
 // in /api/tasks (see phasesFromPipeline). Order = left→right flow; `hitl` is the

@@ -115,7 +115,7 @@ Duyệt `steps` theo thứ tự config, bắt đầu từ `current_phase`.
 Với mỗi step:
 
 1. Cập nhật state: `current_phase = step.id`, `hitl_pending = null`.
-2. Spawn `step.agent` qua Task tool với prompt chứa: task id, parent id nếu có, `step.skills`, `rule_category`, `rule_required`, fallback rule, artifact phải sinh trong `step.produces`, trạng thái `export_json`, và các artifact context hiện có.
+2. Spawn `step.agent` qua Task tool với prompt chứa: task id, parent id nếu có, `step.skills`, `rule_category`, `rule_required`, fallback rule, artifact phải sinh trong `step.produces`, **`knowledge_inputs` bundle** (nếu có), trạng thái `export_json`, và các artifact context hiện có.
 3. Sau khi agent kết thúc, kiểm tra `qa.md`. Nếu file mới hoặc thay đổi, chuyển sang Q&A HITL.
 4. Nếu `export_json = true`, merge structured summary vào `pipeline-export.json` dưới `phases[step.export_key]`.
 5. Xử lý `step.hitl` theo section bên dưới.
@@ -138,9 +138,11 @@ Context:
 - Step name: <step.name>
 - Required artifacts: <step.produces>
 - Export JSON: <true|false>
+- Knowledge inputs: <step.knowledge_inputs or "none">
 
 Instructions:
 - Apply skills: <step.skills>
+- If `knowledge_inputs` is non-empty: read each entry from `.dev-team-agent/knowledge/<id>.md` (id format `project/slug` or `system/slug`), inject a `## Knowledge inputs` section into the prompt with title + full markdown body per entry. Skip missing entries with a note.
 - Apply project-rules section(s): <step.rule_category>
 - If rule_required=true, treat missing rules as already validated by orchestrator.
 - If rule_required=false and section is missing/empty, apply fallback skill: <step.rule_fallback_skill>.

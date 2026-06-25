@@ -1,5 +1,6 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+import { fetchKnowledgeList } from '../api.js'
 
 const props = defineProps({
   stepId: { type: String, default: null },
@@ -9,6 +10,18 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update', 'close'])
+
+const knowledgeEntries = ref([])
+const knowledgeInput = ref('')
+
+onMounted(async () => {
+  try {
+    const data = await fetchKnowledgeList()
+    knowledgeEntries.value = data.entries || []
+  } catch {
+    knowledgeEntries.value = []
+  }
+})
 
 // Local draft — reset when step changes.
 const draft = ref(null)
@@ -28,6 +41,7 @@ watch(
       hitl_gate_id: s.hitl?.gate_id || '',
       hitl_optional_doc_review: s.hitl?.optional_doc_review ?? false,
       hitl_blocking: s.hitl?.blocking ?? false,
+      knowledge_inputs: [...(s.knowledge_inputs || [])],
     }
   },
   { immediate: true },
@@ -61,6 +75,18 @@ function removeSkill(i) {
   draft.value.skills.splice(i, 1)
 }
 
+function addKnowledgeInput() {
+  const v = knowledgeInput.value.trim()
+  if (v && draft.value && !draft.value.knowledge_inputs.includes(v)) {
+    draft.value.knowledge_inputs.push(v)
+  }
+  knowledgeInput.value = ''
+}
+
+function removeKnowledgeInput(i) {
+  draft.value.knowledge_inputs.splice(i, 1)
+}
+
 function apply() {
   if (!draft.value) return
   const hitl = draft.value.hitl_mode === 'none'
@@ -78,6 +104,7 @@ function apply() {
     rule_category: draft.value.rule_category,
     rule_required: draft.value.rule_required,
     produces: draft.value.produces,
+    knowledge_inputs: draft.value.knowledge_inputs,
     hitl,
   })
 }
@@ -171,6 +198,32 @@ function apply() {
             @keydown.enter.prevent="addProduces"
           />
           <button class="btn-ghost btn-sm" @click="addProduces">+</button>
+        </div>
+      </label>
+
+      <!-- Knowledge inputs -->
+      <label class="cfg-label">
+        Knowledge inputs
+        <div class="tag-row">
+          <span
+            v-for="(kid, i) in draft.knowledge_inputs"
+            :key="kid"
+            class="chip chip-rm"
+            @click="removeKnowledgeInput(i)"
+          >{{ kid }} ✕</span>
+        </div>
+        <div class="tag-input-row">
+          <input
+            v-model="knowledgeInput"
+            class="cfg-input cfg-input-sm"
+            list="knowledge-entries-list"
+            placeholder="project/slug…"
+            @keydown.enter.prevent="addKnowledgeInput"
+          />
+          <datalist id="knowledge-entries-list">
+            <option v-for="e in knowledgeEntries" :key="e.id" :value="e.id">{{ e.title }}</option>
+          </datalist>
+          <button class="btn-ghost btn-sm" type="button" @click="addKnowledgeInput">+</button>
         </div>
       </label>
 

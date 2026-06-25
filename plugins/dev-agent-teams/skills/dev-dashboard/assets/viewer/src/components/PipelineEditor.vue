@@ -19,7 +19,8 @@ const props = defineProps({
 
 const nodeTypes = { pipelineEditor: markRaw(PipelineEditorNode) }
 const {
-  addNodes,
+  setNodes,
+  setEdges,
   addEdges,
   removeNodes,
   getNodes,
@@ -82,6 +83,7 @@ async function loadConfig() {
 }
 
 function buildFlowFromPipeline(pipeline) {
+  closeConfig()
   const steps = pipeline?.steps || []
   const newNodes = steps.map((step, i) => ({
     id: step.id,
@@ -94,6 +96,7 @@ function buildFlowFromPipeline(pipeline) {
       rule_category: step.rule_category || '',
       rule_required: step.rule_required ?? true,
       produces: Array.isArray(step.produces) ? step.produces : [],
+      knowledge_inputs: Array.isArray(step.knowledge_inputs) ? step.knowledge_inputs : [],
       hitl: step.hitl || { mode: 'none' },
     },
   }))
@@ -105,8 +108,9 @@ function buildFlowFromPipeline(pipeline) {
     markerEnd: { type: 'arrowclosed' },
   }))
 
-  nodes.value = newNodes
-  edges.value = newEdges
+  setNodes(newNodes)
+  setEdges(newEdges)
+  nodeCounter = steps.length
 }
 
 onConnect((params) => {
@@ -129,8 +133,9 @@ watch(
       return
     }
     if (!props.taskId?.trim()) {
-      nodes.value = []
-      edges.value = []
+      setNodes([])
+      setEdges([])
+      nodeCounter = 0
       return
     }
     configDebounce = setTimeout(() => loadConfig(), 300)
@@ -168,10 +173,11 @@ function onDropOnCanvas(event) {
       rule_category: '',
       rule_required: true,
       produces: [],
+      knowledge_inputs: [],
       hitl: { mode: 'none' },
     },
   }
-  addNodes([newNode])
+  setNodes([...getNodes.value, newNode])
 }
 
 const selectedNodeId = ref(null)
@@ -273,6 +279,7 @@ function buildPipelineFromFlow() {
       rule_category: d.rule_category || '',
       rule_required: d.rule_required ?? true,
       produces: d.produces || [],
+      knowledge_inputs: d.knowledge_inputs || [],
       hitl: d.hitl || { mode: 'none' },
     }
   }).filter(Boolean)
@@ -283,10 +290,10 @@ function autoLayout() {
   const nodeList = getNodes.value
   const edgeList = getEdges.value
   const order = topoSort(nodeList, edgeList)
-  nodes.value = nodes.value.map((n) => {
+  setNodes(nodeList.map((n) => {
     const idx = order.indexOf(n.id)
     return { ...n, position: { x: 20 + Math.max(0, idx) * 220, y: 60 } }
-  })
+  }))
   setTimeout(() => fitView(), 50)
 }
 
@@ -359,6 +366,14 @@ function onProfileLoad(pipeline) {
 const currentPipeline = computed(() => buildPipelineFromFlow())
 const currentSteps = computed(() => currentPipeline.value.steps || [])
 
+const hasFanOut = computed(() => {
+  const outDeg = {}
+  for (const e of getEdges.value) {
+    outDeg[e.source] = (outDeg[e.source] || 0) + 1
+  }
+  return Object.values(outDeg).some((d) => d > 1)
+})
+
 const editorLayoutClass = computed(() => ({
   'editor-layout--left-collapsed': editorLeftCollapsed.value,
   'editor-layout--no-config': !selectedNodeId.value,
@@ -369,6 +384,10 @@ const editorLayoutClass = computed(() => ({
   <div class="editor-root" :class="{ 'preview-active': previewing }">
     <div class="editor-toolbar">
       <ProfileManager :current-pipeline="currentPipeline" @load="onProfileLoad" />
+
+      <div v-if="hasFanOut" class="fanout-warning" role="status">
+        Orchestrator chạy tuần tự — nhánh song song sẽ được sắp xếp theo thứ tự topo khi lưu
+      </div>
 
       <div class="editor-toolbar-actions">
         <button class="btn-ghost btn-sm" @click="autoLayout">Auto-layout</button>

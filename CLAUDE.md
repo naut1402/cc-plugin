@@ -122,3 +122,31 @@ claude plugin marketplace add naut1402/cc-plugin
 # Install a plugin
 claude plugin add task-memory@tttuan-plugins-official
 ```
+
+<!-- dev-team-agent:rules -->
+## Dev Team — Tham chiếu Rule & Cấu trúc
+
+> Orchestrator nạp các rule này qua skill `read-project-rules` ở đầu pipeline.
+> Điền đường dẫn / nội dung cụ thể bên dưới. Mục có ⚠ là **bắt buộc** — pipeline sẽ dừng nếu thiếu.
+
+### Rule coding
+<!-- Điền đường dẫn hoặc mô tả quy tắc coding của project (naming, style, lint rules) -->
+Chưa thiết lập
+
+### Rule viết tài liệu (doc-writing) ⚠ Bắt buộc
+<!-- Investigator và designer đọc rule này để format investigate.md / design.md.
+     Ví dụ: "xem coding-conventions.md §Doc" hoặc paste nội dung trực tiếp. -->
+Chưa thiết lập
+
+### Rule trình bày (presentation)
+<!-- Quy tắc format tài liệu: heading style, ngôn ngữ (vn/jp), bảng vs list, độ dài mục -->
+Chưa thiết lập
+
+### Rule viết test case
+<!-- Framework (PHPUnit/Jest/…), cấu trúc (AAA), coverage targets, naming convention -->
+Chưa thiết lập
+
+### File cấu trúc dự án
+<!-- Đường dẫn file mô tả kiến trúc project, e.g. docs/STRUCTURE.md hoặc src/README.md -->
+Chưa thiết lập
+

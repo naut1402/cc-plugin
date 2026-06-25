@@ -1,24 +1,25 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { fetchTasks } from './api.js'
+import { useLocalToggle } from './lib/useLocalToggle.js'
 import TaskList from './components/TaskList.vue'
 import PipelineView from './components/PipelineView.vue'
 import QaPanel from './components/QaPanel.vue'
 import ArtifactPanel from './components/ArtifactPanel.vue'
 import PipelineEditor from './components/PipelineEditor.vue'
+import RailIcon from './components/RailIcon.vue'
+
+const SIDEBAR_KEY = 'dev-dashboard-sidebar-collapsed'
 
 // ── Mode ─────────────────────────────────────────────────────────────────────
-// 'monitor' → existing read-only dashboard (default)
-// 'editor'  → new pipeline editor
 const mode = ref('monitor')
 
-// Editor scope: 'global' edits .dev-team-agent/pipeline.yaml,
-// 'task' edits tasks/<editorTaskId>/pipeline.yaml.
 const editorScope = ref('global')
 const editorTaskId = ref('')
-// '__manual__' = nhập task id thủ công; '' = chưa chọn
 const editorTaskSelect = ref('')
 const editorTaskManual = ref('')
+
+const { state: sidebarCollapsed, toggle: toggleSidebar } = useLocalToggle(false)
 
 const POLL_MS = 1500
 
@@ -28,13 +29,25 @@ const selectedId = ref(null)
 const error = ref(null)
 const lastUpdated = ref(null)
 const connected = ref(false)
-// Currently open artifact: { taskId, name } | null
 const openArtifact = ref(null)
 let timer = null
 
 const selected = computed(
   () => tasks.value.find((t) => t.task_id === selectedId.value) || null,
 )
+
+function loadSidebarPref() {
+  try {
+    const v = localStorage.getItem(SIDEBAR_KEY)
+    if (v === '1') sidebarCollapsed.value = true
+  } catch { /* ignore */ }
+}
+
+watch(sidebarCollapsed, (v) => {
+  try {
+    localStorage.setItem(SIDEBAR_KEY, v ? '1' : '0')
+  } catch { /* ignore */ }
+})
 
 async function poll() {
   try {
@@ -54,7 +67,6 @@ async function poll() {
   }
 }
 
-// Clear open artifact when selected task changes.
 watch(selectedId, () => {
   openArtifact.value = null
 })
@@ -85,19 +97,18 @@ watch(editorScope, (scope) => {
   }
 })
 
-// Pause polling when in editor mode to avoid stale state overwrites.
 watch(mode, async (m) => {
   clearInterval(timer)
   if (m === 'monitor') {
     poll()
     timer = setInterval(poll, POLL_MS)
   } else {
-    // Refresh task list once when entering editor (polling paused).
     await poll()
   }
 })
 
 onMounted(() => {
+  loadSidebarPref()
   poll()
   timer = setInterval(poll, POLL_MS)
 })
@@ -106,29 +117,49 @@ onUnmounted(() => clearInterval(timer))
 
 <template>
   <div class="layout" :class="{ 'layout-editor': mode === 'editor' }">
-    <aside class="sidebar">
-      <header class="brand">
-        <h1>Dev Team</h1>
-        <span class="dot" :class="{ live: connected }" :title="connected ? 'live' : 'disconnected'"></span>
+    <aside class="sidebar" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+      <header class="brand" :class="{ 'brand-collapsed': sidebarCollapsed }">
+        <button
+          type="button"
+          class="sidebar-toggle rail-icon-btn"
+          :title="sidebarCollapsed ? 'Mở sidebar' : 'Thu gọn sidebar'"
+          :aria-expanded="!sidebarCollapsed"
+          @click="toggleSidebar"
+        >
+          <RailIcon :name="sidebarCollapsed ? 'panelExpand' : 'panelCollapse'" />
+        </button>
+        <h1 v-if="!sidebarCollapsed">Dev Team</h1>
+        <span
+          v-if="!sidebarCollapsed"
+          class="dot"
+          :class="{ live: connected }"
+          :title="connected ? 'live' : 'disconnected'"
+        ></span>
       </header>
-      <p class="root" :title="root">{{ root || '…' }}</p>
+      <p v-if="!sidebarCollapsed" class="root" :title="root">{{ root || '…' }}</p>
 
-      <!-- Mode toggle -->
-      <div class="mode-toggle">
+      <div class="mode-toggle" :class="{ 'mode-toggle-collapsed': sidebarCollapsed }">
         <button
-          class="mode-btn"
+          class="mode-btn rail-icon-btn"
           :class="{ active: mode === 'monitor' }"
+          title="Monitor"
           @click="mode = 'monitor'"
-        >Monitor</button>
+        >
+          <RailIcon name="monitor" />
+          <span v-if="!sidebarCollapsed" class="mode-btn-label">Monitor</span>
+        </button>
         <button
-          class="mode-btn"
+          class="mode-btn rail-icon-btn"
           :class="{ active: mode === 'editor' }"
+          title="Pipeline Editor"
           @click="mode = 'editor'"
-        >Pipeline Editor</button>
+        >
+          <RailIcon name="pipeline" />
+          <span v-if="!sidebarCollapsed" class="mode-btn-label">Pipeline Editor</span>
+        </button>
       </div>
 
-      <!-- Editor scope selector (only in editor mode) -->
-      <div v-if="mode === 'editor'" class="editor-scope">
+      <div v-if="mode === 'editor' && !sidebarCollapsed" class="editor-scope">
         <label class="scope-label">Scope:</label>
         <select v-model="editorScope" class="scope-select">
           <option value="global">Global pipeline.yaml</option>
@@ -155,9 +186,8 @@ onUnmounted(() => clearInterval(timer))
         </template>
       </div>
 
-      <!-- Task list (monitor mode only) -->
       <TaskList
-        v-if="mode === 'monitor'"
+        v-if="mode === 'monitor' && !sidebarCollapsed"
         :tasks="tasks"
         :selected-id="selectedId"
         :open-artifact="openArtifact"
@@ -165,14 +195,13 @@ onUnmounted(() => clearInterval(timer))
         @open-artifact="handleOpenArtifact"
       />
 
-      <footer class="status">
+      <footer v-if="!sidebarCollapsed" class="status">
         <span v-if="error" class="err">⚠ {{ error }}</span>
         <span v-else-if="lastUpdated && mode === 'monitor'">cập nhật {{ lastUpdated }}</span>
         <span v-else-if="mode === 'editor'" class="muted">editor mode — polling paused</span>
       </footer>
     </aside>
 
-    <!-- Monitor mode: existing dashboard -->
     <main v-if="mode === 'monitor'" class="main">
       <template v-if="selected">
         <div class="task-head">
@@ -207,11 +236,11 @@ onUnmounted(() => clearInterval(timer))
       </div>
     </main>
 
-    <!-- Editor mode: pipeline editor -->
     <main v-else class="main main-editor">
       <PipelineEditor
         :scope="editorScope"
         :task-id="editorTaskId"
+        :app-sidebar-collapsed="sidebarCollapsed"
       />
     </main>
   </div>

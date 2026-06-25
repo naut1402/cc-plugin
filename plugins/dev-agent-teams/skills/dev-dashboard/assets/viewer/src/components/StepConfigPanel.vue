@@ -205,8 +205,4 @@ function apply() {
       <button class="btn-primary" @click="apply">Apply</button>
     </div>
   </aside>
-
-  <aside class="step-config-panel step-config-empty" v-else>
-    <p>Click ✎ on a node to configure it.</p>
-  </aside>
 </template>

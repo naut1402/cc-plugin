@@ -5,12 +5,24 @@ import { Handle, Position } from '@vue-flow/core'
 const props = defineProps({
   id: { type: String, required: true },
   data: { type: Object, required: true },
+  previewState: {
+    type: String,
+    default: 'idle',
+    validator: (v) => ['idle', 'pending', 'active', 'done', 'hitl'].includes(v),
+  },
 })
 
 const emit = defineEmits(['edit', 'delete'])
 
 const editing = ref(false)
 const labelDraft = ref('')
+
+const previewLabels = {
+  pending: '⏳ Chờ',
+  active: '▶ Đang chạy',
+  done: '✓ Xong',
+  hitl: '⏸ HITL',
+}
 
 function startEdit() {
   labelDraft.value = props.data.label || ''
@@ -26,8 +38,22 @@ function commitLabel() {
 </script>
 
 <template>
-  <div class="node-editor">
+  <div
+    class="node-editor"
+    :class="{
+      'node-state-pending': previewState === 'pending',
+      'node-state-active': previewState === 'active',
+      'node-state-done': previewState === 'done',
+      'node-state-hitl': previewState === 'hitl',
+    }"
+  >
     <Handle type="target" :position="Position.Left" />
+
+    <span
+      v-if="previewState !== 'idle'"
+      class="preview-status"
+      :class="`preview-status--${previewState}`"
+    >{{ previewLabels[previewState] }}</span>
 
     <div class="node-editor-head">
       <span v-if="!editing" class="node-editor-label" @dblclick="startEdit">

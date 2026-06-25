@@ -9,26 +9,39 @@ import CatalogPanel from './CatalogPanel.vue'
 import RulesPanel from './RulesPanel.vue'
 import StepConfigPanel from './StepConfigPanel.vue'
 import ProfileManager from './ProfileManager.vue'
+import RailIcon from './RailIcon.vue'
 
 const props = defineProps({
-  scope: { type: String, default: 'global' },  // 'global' | 'task'
+  scope: { type: String, default: 'global' },
   taskId: { type: String, default: '' },
+  appSidebarCollapsed: { type: Boolean, default: false },
 })
 
-// ── Vue Flow ──────────────────────────────────────────────────────────────────
-
 const nodeTypes = { pipelineEditor: markRaw(PipelineEditorNode) }
-const { addNodes, addEdges, removeNodes, removeEdges, getNodes, getEdges, onConnect, fitView } = useVueFlow()
+const {
+  addNodes,
+  addEdges,
+  removeNodes,
+  getNodes,
+  getEdges,
+  onConnect,
+  fitView,
+  screenToFlowCoordinate,
+} = useVueFlow()
 
 const nodes = ref([])
 const edges = ref([])
 
-// ── Catalog ───────────────────────────────────────────────────────────────────
-
 const catalog = ref({ skills: [], agents: [] })
 const rulesData = ref({ rules: [], categories: [] })
-const leftTab = ref('catalog') // 'catalog' | 'rules'
+const leftTab = ref('catalog')
 const highlightedCategory = ref(null)
+const { state: editorLeftCollapsed, toggle: toggleEditorLeft, setFalse: expandEditorLeft } = useLocalToggle(false)
+
+function openLeftTab(tab) {
+  leftTab.value = tab
+  expandEditorLeft()
+}
 
 async function loadCatalog() {
   try {
@@ -59,14 +72,12 @@ function onRuleSelect(rule) {
     highlightedCategory.value === rule.category ? null : rule.category
 }
 
-// ── Pipeline config ───────────────────────────────────────────────────────────
-
 async function loadConfig() {
   try {
     const data = await fetchPipelineConfig(props.scope === 'task' ? props.taskId : null)
     buildFlowFromPipeline(data.pipeline)
   } catch {
-    // no-op — canvas stays empty
+    // no-op
   }
 }
 
@@ -98,7 +109,6 @@ function buildFlowFromPipeline(pipeline) {
   edges.value = newEdges
 }
 
-// Auto-connect when user draws an edge.
 onConnect((params) => {
   addEdges([{ ...params, markerEnd: { type: 'arrowclosed' } }])
 })
@@ -127,8 +137,6 @@ watch(
   },
 )
 
-// ── Drop from catalog onto canvas ─────────────────────────────────────────────
-
 const canvasRef = ref(null)
 let nodeCounter = 0
 
@@ -146,16 +154,13 @@ function onDropOnCanvas(event) {
     return
   }
 
-  // Convert drop position to flow coordinates.
-  const bounds = canvasRef.value?.getBoundingClientRect()
-  const x = bounds ? event.clientX - bounds.left - 80 : 100
-  const y = bounds ? event.clientY - bounds.top - 30 : 60
+  const pos = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
 
   const id = `step-${item.name}-${++nodeCounter}`
   const newNode = {
     id,
     type: 'pipelineEditor',
-    position: { x, y },
+    position: { x: pos.x - 60, y: pos.y - 25 },
     data: {
       label: item.name,
       agent: item._type === 'agent' ? item.id : '',
@@ -168,8 +173,6 @@ function onDropOnCanvas(event) {
   }
   addNodes([newNode])
 }
-
-// ── Step config panel ─────────────────────────────────────────────────────────
 
 const selectedNodeId = ref(null)
 const selectedNodeData = ref(null)
@@ -184,6 +187,10 @@ function closeConfig() {
   selectedNodeData.value = null
 }
 
+function onPaneClick() {
+  closeConfig()
+}
+
 function applyStepUpdate(nodeId, updatedData) {
   nodes.value = nodes.value.map((n) =>
     n.id === nodeId ? { ...n, data: { ...n.data, ...updatedData } } : n,
@@ -195,15 +202,6 @@ function deleteNode(nodeId) {
   removeNodes([nodeId])
   if (selectedNodeId.value === nodeId) closeConfig()
 }
-
-// Handle events emitted by PipelineEditorNode via node data callbacks.
-// Vue Flow passes node events through data; we use a wrapper approach.
-function onNodeEvent(event) {
-  if (event.type === 'edit') openConfig(event.nodeId, event.data)
-  if (event.type === 'delete') deleteNode(event.nodeId)
-}
-
-// ── Topological sort → pipeline steps ─────────────────────────────────────────
 
 function topoSort(nodeList, edgeList) {
   const adj = {}
@@ -223,10 +221,40 @@ function topoSort(nodeList, edgeList) {
       if (inDeg[next] === 0) queue.push(next)
     }
   }
-  // Append any remaining (disconnected) nodes preserving x-order.
   const remaining = nodeList.filter((n) => !sorted.includes(n.id)).sort((a, b) => a.position.x - b.position.x)
   return [...sorted, ...remaining.map((n) => n.id)]
 }
+
+const previewOrder = computed(() => topoSort(getNodes.value, getEdges.value))
+
+function getPreviewState(nodeId) {
+  if (!previewing.value || !previewNodeId.value) {
+    if (previewing.value) return 'pending'
+    return 'idle'
+  }
+  const order = previewOrder.value
+  const activeIdx = order.indexOf(previewNodeId.value)
+  const nodeIdx = order.indexOf(nodeId)
+  if (nodeIdx < 0) return 'idle'
+  if (nodeIdx < activeIdx) return 'done'
+  if (nodeId === previewNodeId.value) {
+    return previewHitlPause.value ? 'hitl' : 'active'
+  }
+  return 'pending'
+}
+
+const previewActiveStep = computed(() => {
+  if (!previewing.value || !previewNodeId.value) return null
+  const node = getNodes.value.find((n) => n.id === previewNodeId.value)
+  if (!node) return null
+  const idx = previewOrder.value.indexOf(previewNodeId.value)
+  return {
+    index: idx + 1,
+    total: previewOrder.value.length,
+    label: node.data?.label || previewNodeId.value,
+    agent: node.data?.agent || '',
+  }
+})
 
 function buildPipelineFromFlow() {
   const nodeList = getNodes.value
@@ -251,21 +279,16 @@ function buildPipelineFromFlow() {
   return { version: 1, steps }
 }
 
-// ── Auto-layout ───────────────────────────────────────────────────────────────
-
 function autoLayout() {
   const nodeList = getNodes.value
   const edgeList = getEdges.value
   const order = topoSort(nodeList, edgeList)
-  const nodeMap = Object.fromEntries(nodeList.map((n) => [n.id, n]))
   nodes.value = nodes.value.map((n) => {
     const idx = order.indexOf(n.id)
     return { ...n, position: { x: 20 + Math.max(0, idx) * 220, y: 60 } }
   })
   setTimeout(() => fitView(), 50)
 }
-
-// ── Save to file ──────────────────────────────────────────────────────────────
 
 const saving = ref(false)
 const saveMsg = ref('')
@@ -285,31 +308,35 @@ async function saveToFile() {
   }
 }
 
-// ── Preview / demo mode ───────────────────────────────────────────────────────
-
 const { state: previewing, setTrue: startPreview, setFalse: stopPreview } = useLocalToggle(false)
 const previewNodeId = ref(null)
+const previewHitlPause = ref(false)
 let previewTimer = null
 
 async function runPreview() {
   if (previewing.value) return
+  closeConfig()
   startPreview()
   const order = topoSort(getNodes.value, getEdges.value)
   previewNodeId.value = null
+  previewHitlPause.value = false
 
   for (const id of order) {
     if (!previewing.value) break
     previewNodeId.value = id
+    previewHitlPause.value = false
     await sleep(600)
     if (!previewing.value) break
-    // Pause at HITL nodes.
     const node = getNodes.value.find((n) => n.id === id)
     const hitlMode = node?.data?.hitl?.mode
     if (hitlMode && hitlMode !== 'none') {
+      previewHitlPause.value = true
       await sleep(1200)
+      previewHitlPause.value = false
     }
   }
   previewNodeId.value = null
+  previewHitlPause.value = false
   stopPreview()
 }
 
@@ -317,28 +344,29 @@ function stopDemo() {
   clearTimeout(previewTimer)
   stopPreview()
   previewNodeId.value = null
+  previewHitlPause.value = false
 }
 
 function sleep(ms) {
   return new Promise((res) => { previewTimer = setTimeout(res, ms) })
 }
 
-// ── Profile load ──────────────────────────────────────────────────────────────
-
 function onProfileLoad(pipeline) {
   buildFlowFromPipeline(pipeline)
   setTimeout(() => fitView(), 100)
 }
 
-// ── Current pipeline (for ProfileManager save) ────────────────────────────────
-
 const currentPipeline = computed(() => buildPipelineFromFlow())
 const currentSteps = computed(() => currentPipeline.value.steps || [])
+
+const editorLayoutClass = computed(() => ({
+  'editor-layout--left-collapsed': editorLeftCollapsed.value,
+  'editor-layout--no-config': !selectedNodeId.value,
+}))
 </script>
 
 <template>
   <div class="editor-root" :class="{ 'preview-active': previewing }">
-    <!-- Toolbar -->
     <div class="editor-toolbar">
       <ProfileManager :current-pipeline="currentPipeline" @load="onProfileLoad" />
 
@@ -363,25 +391,58 @@ const currentSteps = computed(() => currentPipeline.value.steps || [])
       </div>
     </div>
 
-    <!-- 3-column layout -->
-    <div class="editor-layout">
-      <!-- Left: catalog + rules -->
-      <div class="editor-left">
-        <div class="editor-left-tabs">
+    <div class="editor-layout" :class="editorLayoutClass">
+      <div class="editor-left" :class="{ 'editor-left-collapsed': editorLeftCollapsed }">
+        <div class="editor-left-tabs" :class="{ 'is-collapsed': editorLeftCollapsed }">
           <button
-            class="editor-left-tab"
-            :class="{ active: leftTab === 'catalog' }"
-            @click="leftTab = 'catalog'"
-          >Catalog</button>
-          <button
-            class="editor-left-tab"
-            :class="{ active: leftTab === 'rules' }"
-            @click="leftTab = 'rules'"
-          >Rules</button>
+            type="button"
+            class="editor-left-collapse-btn rail-icon-btn"
+            :title="editorLeftCollapsed ? 'Mở catalog & rules' : 'Thu gọn catalog'"
+            :aria-expanded="!editorLeftCollapsed"
+            @click="toggleEditorLeft"
+          >
+            <RailIcon :name="editorLeftCollapsed ? 'panelExpand' : 'panelCollapse'" />
+          </button>
+          <template v-if="!editorLeftCollapsed">
+            <button
+              class="editor-left-tab"
+              :class="{ active: leftTab === 'catalog' }"
+              @click="leftTab = 'catalog'"
+            >
+              <RailIcon name="catalog" :size="14" />
+              <span>Catalog</span>
+            </button>
+            <button
+              class="editor-left-tab"
+              :class="{ active: leftTab === 'rules' }"
+              @click="leftTab = 'rules'"
+            >
+              <RailIcon name="rules" :size="14" />
+              <span>Rules</span>
+            </button>
+          </template>
+          <template v-else>
+            <button
+              class="editor-left-tab editor-left-tab-icon rail-icon-btn"
+              :class="{ active: leftTab === 'catalog' }"
+              title="Catalog — mở panel"
+              @click="openLeftTab('catalog')"
+            >
+              <RailIcon name="catalog" />
+            </button>
+            <button
+              class="editor-left-tab editor-left-tab-icon rail-icon-btn"
+              :class="{ active: leftTab === 'rules' }"
+              title="Rules — mở panel"
+              @click="openLeftTab('rules')"
+            >
+              <RailIcon name="rules" />
+            </button>
+          </template>
         </div>
-        <CatalogPanel v-if="leftTab === 'catalog'" :catalog="catalog" />
+        <CatalogPanel v-if="leftTab === 'catalog' && !editorLeftCollapsed" :catalog="catalog" />
         <RulesPanel
-          v-else
+          v-else-if="leftTab === 'rules' && !editorLeftCollapsed"
           :rules="rulesData.rules"
           :categories="rulesData.categories"
           :steps="currentSteps"
@@ -390,7 +451,6 @@ const currentSteps = computed(() => currentPipeline.value.steps || [])
         />
       </div>
 
-      <!-- Center: canvas -->
       <div
         class="vflow-container editor-canvas"
         ref="canvasRef"
@@ -408,13 +468,13 @@ const currentSteps = computed(() => currentPipeline.value.steps || [])
           :nodes-connectable="!previewing"
           :elements-selectable="true"
           class="vflow"
+          @pane-click="onPaneClick"
         >
           <template #node-pipelineEditor="nodeProps">
             <PipelineEditorNode
               v-bind="nodeProps"
+              :preview-state="getPreviewState(nodeProps.id)"
               :class="{
-                'node-preview-active': previewing && previewNodeId === nodeProps.id,
-                'node-preview-done': previewing && previewNodeId !== null && topoSort(getNodes, getEdges).indexOf(nodeProps.id) < topoSort(getNodes, getEdges).indexOf(previewNodeId),
                 'node-rule-highlight': nodeMatchesHighlight(nodeProps.data),
               }"
               @edit="openConfig"
@@ -424,13 +484,20 @@ const currentSteps = computed(() => currentPipeline.value.steps || [])
         </VueFlow>
 
         <div v-if="previewing" class="preview-banner">
-          Simulation — no files written &nbsp;
+          <template v-if="previewActiveStep">
+            <strong>{{ previewActiveStep.index }}/{{ previewActiveStep.total }}</strong>
+            {{ previewActiveStep.label }}
+            <span v-if="previewActiveStep.agent" class="preview-banner-agent">({{ previewActiveStep.agent }})</span>
+            <span v-if="previewHitlPause" class="preview-banner-hitl">— chờ HITL</span>
+          </template>
+          <template v-else>Simulation — no files written</template>
+          &nbsp;
           <button class="btn-danger btn-xs" @click="stopDemo">Stop</button>
         </div>
       </div>
 
-      <!-- Right: step config -->
       <StepConfigPanel
+        v-if="selectedNodeId"
         :step-id="selectedNodeId"
         :step="selectedNodeData"
         :catalog="catalog"

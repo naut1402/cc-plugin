@@ -9,6 +9,7 @@ import QaPanel from './components/QaPanel.vue'
 import ArtifactPanel from './components/ArtifactPanel.vue'
 import PipelineEditor from './components/PipelineEditor.vue'
 import AgentEditor from './components/AgentEditor.vue'
+import KnowledgePanel from './components/KnowledgePanel.vue'
 import RailIcon from './components/RailIcon.vue'
 
 const SIDEBAR_KEY = 'dev-dashboard-sidebar-collapsed'
@@ -217,6 +218,15 @@ onUnmounted(() => clearInterval(timer))
           <RailIcon name="agent" />
           <span v-if="!sidebarCollapsed" class="mode-btn-label">Agent Editor</span>
         </button>
+        <button
+          class="mode-btn rail-icon-btn"
+          :class="{ active: mode === 'knowledge' }"
+          title="Knowledge"
+          @click="mode = 'knowledge'"
+        >
+          <RailIcon name="knowledge" />
+          <span v-if="!sidebarCollapsed" class="mode-btn-label">Knowledge</span>
+        </button>
       </div>
 
       <div v-if="mode === 'editor' && !sidebarCollapsed" class="editor-scope">
@@ -269,6 +279,7 @@ onUnmounted(() => clearInterval(timer))
         <span v-else-if="lastUpdated && mode === 'monitor'">cập nhật {{ lastUpdated }}</span>
         <span v-else-if="mode === 'editor'" class="muted">editor mode — polling paused</span>
         <span v-else-if="mode === 'agentEditor'" class="muted">agent editor — polling paused</span>
+        <span v-else-if="mode === 'knowledge'" class="muted">knowledge — polling paused</span>
       </footer>
     </aside>
 
@@ -313,6 +324,10 @@ onUnmounted(() => clearInterval(timer))
         :task-id="editorTaskId"
         :app-sidebar-collapsed="sidebarCollapsed"
       />
+    </main>
+
+    <main v-else-if="mode === 'knowledge'" class="main main-editor">
+      <KnowledgePanel />
     </main>
 
     <main v-else class="main main-editor">

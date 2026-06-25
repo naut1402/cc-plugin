@@ -3,6 +3,7 @@ import fsSync from 'node:fs'
 import path from 'node:path'
 import yaml from 'js-yaml'
 import { createRegistryContext } from './registry.js'
+import { handleKnowledgeApi } from './knowledge/knowledgeApi.js'
 import {
   parseAgentMarkdown,
   compileAgentMarkdown,
@@ -742,6 +743,15 @@ function patchSteps(baseSteps, patch) {
   return out
 }
 
+// Editor saves a full per-task pipeline (steps_replace: true). Hand-written overrides
+// patch by step.id unless every per-task id is new (disjoint from base).
+function perTaskStepsReplace(baseSteps, per) {
+  if (per.steps_replace === true) return true
+  if (!Array.isArray(per.steps) || per.steps.length === 0) return false
+  const baseIds = new Set(baseSteps.map((s) => s.id))
+  return !per.steps.some((s) => s.id && baseIds.has(s.id))
+}
+
 async function readYamlSafe(p) {
   try {
     const raw = await fs.readFile(p, 'utf8')
@@ -753,7 +763,7 @@ async function readYamlSafe(p) {
 }
 
 // Resolve pipeline config: built-in default ← global pipeline.yaml (full step
-// replace) ← per-task tasks/<id>/pipeline.yaml (patch by id).
+// replace) ← per-task tasks/<id>/pipeline.yaml (patch by id, or full replace).
 async function loadPipelineConfig(root, id) {
   const cfg = JSON.parse(JSON.stringify(DEFAULT_PIPELINE))
   let source = 'builtin'
@@ -770,10 +780,17 @@ async function loadPipelineConfig(root, id) {
   if (id) {
     const per = await readYamlSafe(path.join(root, 'tasks', id, 'pipeline.yaml'))
     if (per) {
-      if (Array.isArray(per.steps)) cfg.steps = patchSteps(cfg.steps, per.steps)
+      if (Array.isArray(per.steps)) {
+        if (perTaskStepsReplace(cfg.steps, per)) {
+          cfg.steps = per.steps
+          source = source === 'global' ? 'global+task-replace' : 'task-replace'
+        } else {
+          cfg.steps = patchSteps(cfg.steps, per.steps)
+          source = source === 'global' ? 'global+task' : 'task'
+        }
+      }
       if (per.defaults) cfg.defaults = { ...cfg.defaults, ...per.defaults }
       if (per.doc_reviewer) cfg.doc_reviewer = { ...cfg.doc_reviewer, ...per.doc_reviewer }
-      source = source === 'global' ? 'global+task' : 'task'
     }
   }
 
@@ -957,6 +974,12 @@ export function createApiHandler(ctx) {
     const root = resolveProjectRoot(projectId)
     const profilePath = root ? path.join(root, 'orchestrator-profile.json') : null
     const unknownProject = () => json(res, 404, { error: 'unknown project', project: projectId })
+
+    if (url.pathname.startsWith('/api/knowledge')) {
+      if (!root) return unknownProject()
+      await handleKnowledgeApi(req, res, url, root)
+      return
+    }
 
     // ── Project registry CRUD (no per-project root needed) ───────────────
     if (url.pathname === '/api/projects') {
@@ -1219,7 +1242,11 @@ export function createApiHandler(ctx) {
             } else {
               return json(res, 400, { error: 'scope must be "global" or "task" (with taskId)' })
             }
-            await fs.writeFile(target, yaml.dump(pipeline, { lineWidth: 120 }), 'utf8')
+            const toWrite =
+              scope === 'task'
+                ? { ...pipeline, steps_replace: true }
+                : pipeline
+            await fs.writeFile(target, yaml.dump(toWrite, { lineWidth: 120 }), 'utf8')
             return json(res, 200, { written: true, scope, target })
           }
 

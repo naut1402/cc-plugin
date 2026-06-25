@@ -23,6 +23,7 @@ steps:
     rule_category: doc-writing  # section trong project-rules.md
     rule_required: true         # true = thiếu rule thì DỪNG
     produces: [investigate.md]  # artifact bước này sinh ra
+    knowledge_inputs: []        # optional: [project/slug, system/foo] — file .md trong .dev-team-agent/knowledge/
     export_key: investigator    # key trong pipeline-export.json
     hitl:
       mode: manual              # manual | auto | none

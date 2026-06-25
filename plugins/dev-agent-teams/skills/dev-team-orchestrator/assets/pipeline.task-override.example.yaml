@@ -4,6 +4,9 @@
 #   - step trùng id  -> đè field (merge `hitl` một cấp)
 #   - id mới         -> thêm vào cuối
 #   - remove: true   -> bỏ hẳn bước đó
+# Hoặc thay toàn bộ steps (pipeline editor / custom flow):
+#   steps_replace: true
+#   steps: [ ... danh sách đầy đủ ... ]
 # `defaults` / `doc_reviewer` merge theo từng key.
 # Chỉ cần khai phần muốn thay đổi.
 version: 1

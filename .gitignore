@@ -2,3 +2,6 @@
 .vscode/
 .env
 .claude/
+
+# dev-agent-teams dashboard + state
+.dev-team-agent/

@@ -1,26 +1,70 @@
 // Thin fetch wrappers around the dev-server API exposed by server/devTeamApi.js.
 
-export async function fetchTasks() {
-  const r = await fetch('/api/tasks')
+// Build a query string from key/value pairs, dropping null/undefined/empty and
+// URL-encoding values. Used to append the optional `?project=<id>` selector.
+function qs(params) {
+  const parts = []
+  for (const [k, v] of Object.entries(params || {})) {
+    if (v === null || v === undefined || v === '') continue
+    parts.push(`${k}=${encodeURIComponent(v)}`)
+  }
+  return parts.length ? `?${parts.join('&')}` : ''
+}
+
+// ── Project registry ───────────────────────────────────────────────────────────
+
+export async function fetchProjects() {
+  const r = await fetch('/api/projects')
+  if (!r.ok) throw new Error(`/api/projects → ${r.status}`)
+  return r.json()
+}
+
+export async function fetchProject(id) {
+  const r = await fetch(`/api/projects${qs({ id })}`)
+  if (!r.ok) throw new Error(`/api/projects?id=${id} → ${r.status}`)
+  return r.json()
+}
+
+export async function addProject(path, name) {
+  const r = await fetch('/api/projects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, name }),
+  })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(data.error || `/api/projects POST → ${r.status}`)
+  return data
+}
+
+export async function removeProject(id) {
+  const r = await fetch(`/api/projects${qs({ id })}`, { method: 'DELETE' })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(data.error || `/api/projects DELETE → ${r.status}`)
+  return data
+}
+
+// ── Task / artifact reads (project-scoped) ──────────────────────────────────────
+
+export async function fetchTasks(projectId) {
+  const r = await fetch(`/api/tasks${qs({ project: projectId })}`)
   if (!r.ok) throw new Error(`/api/tasks → ${r.status}`)
   return r.json()
 }
 
-export async function fetchArtifact(id, name) {
-  const r = await fetch(`/api/artifact?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}`)
+export async function fetchArtifact(id, name, projectId) {
+  const r = await fetch(`/api/artifact${qs({ id, name, project: projectId })}`)
   if (!r.ok) throw new Error(`/api/artifact ${name} → ${r.status}`)
   return r.json()
 }
 
-export async function fetchPipelineExport(id) {
-  const r = await fetch(`/api/pipeline-export?id=${encodeURIComponent(id)}`)
+export async function fetchPipelineExport(id, projectId) {
+  const r = await fetch(`/api/pipeline-export${qs({ id, project: projectId })}`)
   if (!r.ok) throw new Error(`/api/pipeline-export → ${r.status}`)
   return r.json()
 }
 
-export async function fetchPipelineConfig(id) {
-  const q = id ? `?id=${encodeURIComponent(id)}` : ''
-  const r = await fetch(`/api/pipeline-config${q}`)
+export async function fetchPipelineConfig(id, projectId) {
+  const r = await fetch(`/api/pipeline-config${qs({ id, project: projectId })}`)
   if (!r.ok) throw new Error(`/api/pipeline-config → ${r.status}`)
   return r.json()
 }

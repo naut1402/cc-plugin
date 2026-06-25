@@ -77,6 +77,22 @@ Thông báo:
 - Dashboard tự cập nhật realtime — cứ để mở khi chạy `/dev-team-orchestrator`.
 - Dừng server: tắt tiến trình `npm run dev` (Ctrl-C hoặc kill background task).
 
+## Chế độ đa-project (standalone server)
+
+Để theo dõi **nhiều project** từ một dashboard duy nhất, chạy server độc lập (không nằm trong một `.dev-team-agent/` cụ thể):
+
+```bash
+cd "<project-root>/.dev-team-agent/viewer" && npm install && npm run build && npm run serve
+```
+
+- `npm run serve` chạy `server/standalone.js` (Node `node:http`): serve `dist/` tĩnh + API `/api/*`, bind `127.0.0.1:5174` (local-first; chưa expose ra mạng). `npm start` = build + serve.
+- **Project registry**: danh sách project lưu ở `~/.dev-team-dashboard/projects.json` (override bằng env `DEV_TEAM_DASHBOARD_HOME`). Mỗi entry trỏ tới một thư mục `.dev-team-agent/`.
+- **Thêm/xoá project**:
+  - Qua UI: sidebar "Projects" → nút **＋**, nhập đường dẫn `.dev-team-agent/` (hoặc project root chứa nó) + tên hiển thị tuỳ chọn. Nút **×** gỡ project (chỉ gỡ khỏi registry, **không** xoá file). Không gỡ được project `default`.
+  - Qua MCP: server `dev-team-dashboard` (khai báo ở `plugins/dev-agent-teams/.mcp.json`) cung cấp 4 tool `list_projects` / `add_project` / `remove_project` / `get_project`, dùng **chung** `projects.json` với UI/REST.
+- **Tương thích ngược**: nếu set env `DEV_TEAM_ROOT`, project đó tự được seed làm `default` khi registry rỗng. Mọi endpoint cũ nhận thêm query optional `?project=<id>`; không truyền → dùng project mặc định và giữ nguyên shape `{ root, tasks }`.
+- Chạy **nền** rồi báo user URL. Dừng: tắt tiến trình `npm run serve`.
+
 ## Dashboard hiển thị gì
 
 - **Danh sách task** (dashboard tổng): mọi task trong `.dev-state/`, đánh dấu task đang chờ Q&A / HITL.

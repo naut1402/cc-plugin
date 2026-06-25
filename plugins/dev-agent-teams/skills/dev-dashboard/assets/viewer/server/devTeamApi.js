@@ -2,6 +2,12 @@ import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
 import yaml from 'js-yaml'
+import {
+  parseAgentMarkdown,
+  compileAgentMarkdown,
+  heuristicDraftFromDescription,
+  emptyDraft,
+} from '../src/lib/agentMarkdown.js'
 
 // ── Catalog helpers ──────────────────────────────────────────────────────────
 
@@ -308,6 +314,7 @@ async function scanProjectClaude(projectRoot, opts = {}) {
 }
 
 function sourcePriority(source) {
+  if (source === 'dashboard') return 55
   if (source === 'project') return 50
   if (source === 'user') return 20
   if (source === 'cursor') return 10
@@ -361,6 +368,7 @@ async function buildCatalog(root) {
     await scanCursorSkills(catalogOpts),
     await scanUserSkills(catalogOpts),
     await scanUserAgents(),
+    { skills: [], agents: await scanCustomAgents(root) },
     ...(enabledInstalls.length ? [] : [await scanPluginCache(catalogOpts)]),
     await scanRepoPlugins(projectRoot, {
       ...catalogOpts,
@@ -452,6 +460,163 @@ function sanitiseProfileName(name) {
   if (/[\\/\0]/.test(name)) return null
   const clean = name.trim().replace(/[^a-zA-Z0-9_\-. ]/g, '').slice(0, 64)
   return clean || null
+}
+
+function sanitiseAgentName(name) {
+  if (typeof name !== 'string' || !name.trim()) return null
+  if (/[\\/\0]/.test(name)) return null
+  const clean = name.trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64)
+  return clean || null
+}
+
+function customAgentsDir(root) {
+  return path.join(root, 'custom-agents')
+}
+
+function agentTemplatesDir(root) {
+  return path.join(root, 'agent-templates')
+}
+
+async function scanCustomAgents(root) {
+  const dir = customAgentsDir(root)
+  const agents = []
+  for (const entry of await safeReadDir(dir)) {
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue
+    const agentName = entry.name.replace(/\.md$/, '')
+    try {
+      const raw = await fs.readFile(path.join(dir, entry.name), 'utf8')
+      const draft = parseAgentMarkdown(raw, yaml)
+      agents.push({
+        id: `dashboard:${agentName}`,
+        name: agentName,
+        plugin: 'dashboard',
+        source: 'dashboard',
+        description: (draft.description || '').slice(0, 140),
+        skills: draft.skills || [],
+        editable: true,
+      })
+    } catch {
+      /* skip */
+    }
+  }
+  return agents
+}
+
+async function listCustomAgentMeta(root) {
+  const dir = customAgentsDir(root)
+  const agents = []
+  for (const entry of await safeReadDir(dir)) {
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue
+    const name = entry.name.replace(/\.md$/, '')
+    try {
+      const raw = await fs.readFile(path.join(dir, entry.name), 'utf8')
+      const draft = parseAgentMarkdown(raw, yaml)
+      agents.push({
+        name,
+        description: draft.description || '',
+        model: draft.model || '',
+        editable: draft.created_by === 'dashboard' || draft.editable !== false,
+      })
+    } catch {
+      agents.push({ name, description: '', model: '', editable: true })
+    }
+  }
+  return agents.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+async function readCustomAgent(root, name) {
+  const clean = sanitiseAgentName(name)
+  if (!clean) return null
+  const fp = path.join(customAgentsDir(root), `${clean}.md`)
+  try {
+    const content = await fs.readFile(fp, 'utf8')
+    const draft = parseAgentMarkdown(content, yaml)
+    return { name: clean, content, draft }
+  } catch {
+    return null
+  }
+}
+
+function isPrivateHostname(hostname) {
+  const h = (hostname || '').toLowerCase()
+  if (h === 'localhost' || h.endsWith('.local')) return true
+  if (/^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h)) return true
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true
+  return false
+}
+
+async function fetchUrlSafe(urlStr) {
+  let u
+  try {
+    u = new URL(urlStr)
+  } catch {
+    throw new Error('invalid URL')
+  }
+  if (u.protocol !== 'https:') throw new Error('only https URLs allowed')
+  if (isPrivateHostname(u.hostname)) throw new Error('private hosts not allowed')
+  const res = await fetch(urlStr, { redirect: 'follow', signal: AbortSignal.timeout(15000) })
+  if (!res.ok) throw new Error(`fetch failed: ${res.status}`)
+  const text = await res.text()
+  if (text.length > 512_000) throw new Error('response too large')
+  return text
+}
+
+async function generateDraftFromNl(description) {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (apiKey && description?.trim()) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2048,
+          messages: [{
+            role: 'user',
+            content: `Tạo JSON AgentDraft cho agent Claude Code từ mô tả sau. Trả về CHỈ JSON hợp lệ với keys: name, description, model, skills (array), parameters (array of {name, description}), sections (object role/skills/workflow/guardrail/output), section_order, workflow_steps.\n\nMô tả: ${description}`,
+          }],
+        }),
+        signal: AbortSignal.timeout(60000),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const text = data.content?.[0]?.text || ''
+        const match = text.match(/\{[\s\S]*\}/)
+        if (match) {
+          const parsed = JSON.parse(match[0])
+          return { ...emptyDraft(), ...parsed, sections: { ...emptyDraft().sections, ...parsed.sections } }
+        }
+      }
+    } catch {
+      /* fallback heuristic */
+    }
+  }
+  return heuristicDraftFromDescription(description || '')
+}
+
+async function ensureDefaultTemplate(root) {
+  const dir = agentTemplatesDir(root)
+  await fs.mkdir(dir, { recursive: true })
+  const fp = path.join(dir, 'default-agent.md')
+  try {
+    await fs.access(fp)
+  } catch {
+    const draft = emptyDraft({
+      name: 'default-agent',
+      description: 'Agent mẫu — chỉnh sửa theo nhu cầu',
+      sections: {
+        role: 'Mô tả vai trò của agent.',
+        workflow: '1. Bước đầu\n2. Bước tiếp theo',
+        guardrail: '- Tuân thủ project rules',
+        output: '- Ghi artifact vào task folder',
+      },
+    })
+    await fs.writeFile(fp, compileAgentMarkdown(draft, yaml), 'utf8')
+  }
 }
 
 // Vite plugin: exposes a tiny read-only API over the `.dev-team-agent/` data
@@ -894,6 +1059,167 @@ export function devTeamApi({ root }) {
             }
             await fs.writeFile(target, yaml.dump(pipeline, { lineWidth: 120 }), 'utf8')
             return json(res, 200, { written: true, scope, target })
+          }
+
+          // ── Custom agents (dashboard-created) ─────────────────────────────
+          if (url.pathname === '/api/custom-agents') {
+            if (req.method === 'GET') {
+              const name = url.searchParams.get('name')
+              if (name) {
+                const agent = await readCustomAgent(root, name)
+                if (!agent) return json(res, 404, { error: 'not found' })
+                return json(res, 200, agent)
+              }
+              const agents = await listCustomAgentMeta(root)
+              return json(res, 200, { agents })
+            }
+            if (req.method === 'POST') {
+              let body = ''
+              for await (const chunk of req) body += chunk
+              let parsed
+              try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+              const draft = parsed.draft || parsed
+              const clean = sanitiseAgentName(draft.name)
+              if (!clean) return json(res, 400, { error: 'invalid agent name' })
+              await fs.mkdir(customAgentsDir(root), { recursive: true })
+              const content = compileAgentMarkdown({ ...draft, name: clean }, yaml)
+              await fs.writeFile(path.join(customAgentsDir(root), `${clean}.md`), content, 'utf8')
+              return json(res, 200, { saved: true, name: clean })
+            }
+            if (req.method === 'DELETE') {
+              const name = sanitiseAgentName(url.searchParams.get('name') || '')
+              if (!name) return json(res, 400, { error: 'invalid name' })
+              try {
+                await fs.unlink(path.join(customAgentsDir(root), `${name}.md`))
+                return json(res, 200, { deleted: true, name })
+              } catch {
+                return json(res, 404, { error: 'not found' })
+              }
+            }
+          }
+
+          if (url.pathname === '/api/custom-agents/export' && req.method === 'POST') {
+            let body = ''
+            for await (const chunk of req) body += chunk
+            let parsed
+            try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+            const name = sanitiseAgentName(parsed.name)
+            if (!name) return json(res, 400, { error: 'invalid name' })
+            const agent = await readCustomAgent(root, name)
+            if (!agent) return json(res, 404, { error: 'agent not found' })
+            const projectRoot = path.dirname(root)
+            const exportDir = path.join(projectRoot, '.claude', 'agents')
+            await fs.mkdir(exportDir, { recursive: true })
+            const dest = path.join(exportDir, `${name}.md`)
+            if (!parsed.overwrite) {
+              try {
+                await fs.access(dest)
+                return json(res, 409, { error: 'file exists', path: `.claude/agents/${name}.md` })
+              } catch { /* ok */ }
+            }
+            await fs.writeFile(dest, agent.content, 'utf8')
+            return json(res, 200, { exported: true, path: `.claude/agents/${name}.md` })
+          }
+
+          if (url.pathname === '/api/custom-agents/generate' && req.method === 'POST') {
+            let body = ''
+            for await (const chunk of req) body += chunk
+            let parsed
+            try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+            const draft = await generateDraftFromNl(parsed.description || '')
+            return json(res, 200, { draft })
+          }
+
+          // ── Agent templates ───────────────────────────────────────────────
+          if (url.pathname === '/api/agent-templates') {
+            await ensureDefaultTemplate(root)
+            const tplDir = agentTemplatesDir(root)
+            if (req.method === 'GET') {
+              const name = url.searchParams.get('name')
+              if (name) {
+                const clean = sanitiseAgentName(name) || sanitiseProfileName(name)
+                if (!clean) return json(res, 400, { error: 'invalid name' })
+                try {
+                  const raw = await fs.readFile(path.join(tplDir, `${clean}.md`), 'utf8')
+                  const draft = parseAgentMarkdown(raw, yaml)
+                  return json(res, 200, { name: clean, content: raw, draft })
+                } catch {
+                  return json(res, 404, { error: 'not found' })
+                }
+              }
+              const templates = []
+              for (const entry of await safeReadDir(tplDir)) {
+                if (!entry.isFile() || !entry.name.endsWith('.md')) continue
+                const n = entry.name.replace(/\.md$/, '')
+                try {
+                  const raw = await fs.readFile(path.join(tplDir, entry.name), 'utf8')
+                  const d = parseAgentMarkdown(raw, yaml)
+                  templates.push({ name: n, description: d.description || '' })
+                } catch {
+                  templates.push({ name: n, description: '' })
+                }
+              }
+              return json(res, 200, { templates: templates.sort((a, b) => a.name.localeCompare(b.name)) })
+            }
+            if (req.method === 'POST') {
+              const ctype = req.headers['content-type'] || ''
+              if (ctype.includes('multipart/form-data')) {
+                let body = ''
+                for await (const chunk of req) body += chunk
+                const boundary = ctype.split('boundary=')[1]
+                if (!boundary) return json(res, 400, { error: 'missing boundary' })
+                const parts = body.split(`--${boundary}`)
+                let fileContent = ''
+                let fileName = 'uploaded-template'
+                for (const part of parts) {
+                  if (part.includes('filename=')) {
+                    const fnMatch = /filename="([^"]+)"/.exec(part)
+                    if (fnMatch) fileName = fnMatch[1].replace(/\.md$/i, '')
+                    const idx = part.indexOf('\r\n\r\n')
+                    if (idx >= 0) fileContent = part.slice(idx + 4).replace(/\r\n--$/, '').trim()
+                  }
+                }
+                if (!fileContent) return json(res, 400, { error: 'no file content' })
+                const clean = sanitiseAgentName(fileName) || 'uploaded-template'
+                await fs.mkdir(tplDir, { recursive: true })
+                await fs.writeFile(path.join(tplDir, `${clean}.md`), fileContent, 'utf8')
+                return json(res, 200, { saved: true, name: clean })
+              }
+              let body = ''
+              for await (const chunk of req) body += chunk
+              let parsed
+              try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+              if (parsed.url) {
+                let text
+                try {
+                  text = await fetchUrlSafe(parsed.url)
+                } catch (e) {
+                  return json(res, 400, { error: String(e.message || e) })
+                }
+                const draft = parseAgentMarkdown(text, yaml)
+                const clean = sanitiseAgentName(parsed.name || draft.name || 'url-template') || 'url-template'
+                await fs.mkdir(tplDir, { recursive: true })
+                await fs.writeFile(path.join(tplDir, `${clean}.md`), text, 'utf8')
+                return json(res, 200, { saved: true, name: clean, draft })
+              }
+              const draft = parsed.draft || parsed
+              const clean = sanitiseAgentName(draft.name || parsed.name)
+              if (!clean) return json(res, 400, { error: 'invalid template name' })
+              await fs.mkdir(tplDir, { recursive: true })
+              const content = compileAgentMarkdown(draft, yaml)
+              await fs.writeFile(path.join(tplDir, `${clean}.md`), content, 'utf8')
+              return json(res, 200, { saved: true, name: clean })
+            }
+            if (req.method === 'DELETE') {
+              const name = sanitiseAgentName(url.searchParams.get('name') || '') || sanitiseProfileName(url.searchParams.get('name') || '')
+              if (!name) return json(res, 400, { error: 'invalid name' })
+              try {
+                await fs.unlink(path.join(tplDir, `${name}.md`))
+                return json(res, 200, { deleted: true, name })
+              } catch {
+                return json(res, 404, { error: 'not found' })
+              }
+            }
           }
 
           return json(res, 404, { error: 'unknown endpoint' })

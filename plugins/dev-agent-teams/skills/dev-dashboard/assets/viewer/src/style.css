@@ -1089,12 +1089,19 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-si
   resize: vertical;
 }
 .section-list { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.section-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
 .section-block {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px;
   background: var(--panel);
 }
+.section-block.collapsed .section-body { display: none; }
 .section-head {
   display: flex;
   align-items: center;
@@ -1103,14 +1110,71 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-si
   font-weight: 600;
   margin-bottom: 8px;
 }
+.section-block.collapsed .section-head { margin-bottom: 0; }
+.section-collapse-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 1;
+}
+.section-title { flex: 1; min-width: 0; }
+.section-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
 .drag-handle { cursor: grab; color: var(--muted); }
 .skill-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .skill-chips .chip.active { border-color: var(--accent); background: var(--accent-dim); }
 .parameters-block { margin: 12px 0; }
 .parameters-head { display: flex; align-items: center; justify-content: space-between; }
 .param-row { display: flex; gap: 8px; margin-top: 6px; align-items: center; }
-.workflow-step-picker { margin: 12px 0; }
-.workflow-steps { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
-.workflow-step-item { font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.workflow-section-editor { margin-top: 4px; }
+.workflow-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.workflow-tab {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.workflow-tab.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.workflow-builder-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.workflow-builder-empty { font-size: 12px; margin: 0 0 8px; }
+.workflow-builder-step {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: var(--panel-2);
+}
+.workflow-builder-step-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.workflow-step-num { font-size: 11px; font-weight: 600; flex: 1; }
+.workflow-builder-step .cfg-input { margin-bottom: 6px; }
 .nl-actions { display: flex; gap: 8px; margin-top: 10px; }
 .ok-msg { color: var(--ok); font-size: 12px; }

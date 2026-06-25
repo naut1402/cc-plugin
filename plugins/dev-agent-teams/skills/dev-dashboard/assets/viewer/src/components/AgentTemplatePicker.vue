@@ -4,6 +4,7 @@ import {
   fetchAgentTemplates,
   fetchAgentTemplate,
   fetchCatalog,
+  fetchCatalogAgent,
   importAgentTemplateUrl,
   uploadAgentTemplate,
   deleteAgentTemplate,
@@ -41,9 +42,17 @@ async function loadTemplate(name) {
   }
 }
 
-function copyCatalogAgent(agent) {
-  emit('apply-draft', draftFromCatalogAgent(agent))
-  emit('close')
+async function copyCatalogAgent(agent) {
+  error.value = ''
+  try {
+    const data = await fetchCatalogAgent(agent.id)
+    emit('apply-draft', { ...data.draft, name: `${agent.name}-copy` })
+    emit('close')
+  } catch (e) {
+    emit('apply-draft', draftFromCatalogAgent(agent))
+    emit('close')
+    error.value = `Copy fallback (không đọc được file gốc): ${e.message || e}`
+  }
 }
 
 async function importUrl() {

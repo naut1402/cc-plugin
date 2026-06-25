@@ -7,6 +7,7 @@ import {
   compileAgentMarkdown,
   heuristicDraftFromDescription,
   emptyDraft,
+  draftFromAgentMarkdown,
 } from '../src/lib/agentMarkdown.js'
 
 // ── Catalog helpers ──────────────────────────────────────────────────────────
@@ -394,6 +395,71 @@ async function buildCatalog(root) {
   return { skills, agents }
 }
 
+function parseCatalogAgentId(id) {
+  if (typeof id !== 'string' || !id.includes(':')) return null
+  const i = id.lastIndexOf(':')
+  if (i <= 0) return null
+  return { source: id.slice(0, i), name: id.slice(i + 1) }
+}
+
+async function latestPluginCacheDir(pluginName) {
+  const cacheRoot = path.join(homeDir(), '.claude', 'plugins', 'cache')
+  for (const market of await safeReadDir(cacheRoot)) {
+    if (!market.isDirectory()) continue
+    const pluginPath = path.join(cacheRoot, market.name, pluginName)
+    const versions = (await safeReadDir(pluginPath)).filter((e) => e.isDirectory())
+    if (!versions.length) continue
+    let latestDir = versions[0].name
+    let latestMtime = 0
+    for (const v of versions) {
+      const meta = await statSafe(path.join(pluginPath, v.name))
+      if (meta.mtime > latestMtime) {
+        latestMtime = meta.mtime
+        latestDir = v.name
+      }
+    }
+    return path.join(pluginPath, latestDir)
+  }
+  return null
+}
+
+async function resolveCatalogAgentPath(projectRoot, root, id) {
+  const parsed = parseCatalogAgentId(id)
+  if (!parsed?.name) return null
+  const { source, name } = parsed
+  const fileName = `${name}.md`
+
+  if (source === 'dashboard') {
+    return path.join(customAgentsDir(root), fileName)
+  }
+  if (source === 'user') {
+    return path.join(homeDir(), '.claude', 'agents', fileName)
+  }
+  if (source === 'project') {
+    return path.join(projectRoot, '.claude', 'agents', fileName)
+  }
+  if (source.startsWith('repo:')) {
+    const pluginName = source.slice('repo:'.length)
+    const found = await findMarketplaceJson(projectRoot)
+    if (!found) return null
+    const plugins = Array.isArray(found.data.plugins) ? found.data.plugins : []
+    const hit = plugins.find((p) => (p.name || path.basename(p.source)) === pluginName)
+    if (!hit?.source) return null
+    return path.join(path.resolve(found.dir, hit.source), 'agents', fileName)
+  }
+  if (source.startsWith('plugin:')) {
+    const pluginName = source.slice('plugin:'.length)
+    const installs = await loadEnabledPluginInstalls()
+    const install = installs.find((i) => i.name === pluginName)
+    if (install?.installPath) {
+      return path.join(install.installPath, 'agents', fileName)
+    }
+    const cacheDir = await latestPluginCacheDir(pluginName)
+    if (cacheDir) return path.join(cacheDir, 'agents', fileName)
+  }
+  return null
+}
+
 // ── Rules helpers ────────────────────────────────────────────────────────────
 
 const RULE_CATEGORIES = ['coding', 'doc-writing', 'doc-review', 'test', 'git-pr', 'other']
@@ -475,6 +541,10 @@ function customAgentsDir(root) {
 
 function agentTemplatesDir(root) {
   return path.join(root, 'agent-templates')
+}
+
+function workflowStepTemplatesDir(root) {
+  return path.join(root, 'workflow-step-templates')
 }
 
 async function scanCustomAgents(root) {
@@ -577,7 +647,7 @@ async function generateDraftFromNl(description) {
           max_tokens: 2048,
           messages: [{
             role: 'user',
-            content: `Tạo JSON AgentDraft cho agent Claude Code từ mô tả sau. Trả về CHỈ JSON hợp lệ với keys: name, description, model, skills (array), parameters (array of {name, description}), sections (object role/skills/workflow/guardrail/output), section_order, workflow_steps.\n\nMô tả: ${description}`,
+            content: `Tạo JSON AgentDraft cho agent Claude Code từ mô tả sau. Trả về CHỈ JSON hợp lệ với keys: name, description, model, skills (array), parameters (array of {name, description}), sections (object role/skills/workflow/guardrail/output), section_order.\n\nMô tả: ${description}`,
           }],
         }),
         signal: AbortSignal.timeout(60000),
@@ -970,6 +1040,47 @@ export function devTeamApi({ root }) {
             return json(res, 200, catalog)
           }
 
+          if (url.pathname === '/api/catalog-agent' && req.method === 'GET') {
+            const id = url.searchParams.get('id')
+            if (!id) return json(res, 400, { error: 'missing id' })
+            const projectRoot = path.dirname(root)
+            let agentPath = await resolveCatalogAgentPath(projectRoot, root, id)
+            if (!agentPath) {
+              const parsed = parseCatalogAgentId(id)
+              if (parsed?.source?.startsWith('repo:')) {
+                const pluginName = parsed.source.slice('repo:'.length)
+                const builtin = path.join(
+                  projectRoot,
+                  'plugins',
+                  pluginName,
+                  'agents',
+                  `${parsed.name}.md`,
+                )
+                try {
+                  await fs.access(builtin)
+                  agentPath = builtin
+                } catch {
+                  /* not found */
+                }
+              }
+            }
+            if (!agentPath) return json(res, 404, { error: 'agent file not found' })
+            try {
+              const raw = await fs.readFile(agentPath, 'utf8')
+              const meta = parseCatalogAgentId(id)
+              const draft = draftFromAgentMarkdown(raw, yaml, {
+                name: meta?.name,
+                description: '',
+              })
+              const fm = parseFrontmatter(raw)
+              if (fm.description) draft.description = fm.description
+              if (Array.isArray(fm.skills) && fm.skills.length) draft.skills = [...fm.skills]
+              return json(res, 200, { id, path: agentPath, content: raw, draft })
+            } catch (e) {
+              return json(res, 500, { error: String(e.message || e) })
+            }
+          }
+
           if (url.pathname === '/api/rules' && req.method === 'GET') {
             const rulesData = await buildRules(root)
             return json(res, 200, rulesData)
@@ -1215,6 +1326,66 @@ export function devTeamApi({ root }) {
               if (!name) return json(res, 400, { error: 'invalid name' })
               try {
                 await fs.unlink(path.join(tplDir, `${name}.md`))
+                return json(res, 200, { deleted: true, name })
+              } catch {
+                return json(res, 404, { error: 'not found' })
+              }
+            }
+          }
+
+          // ── Workflow step templates (builder) ─────────────────────────────
+          if (url.pathname === '/api/workflow-step-templates') {
+            const tplDir = workflowStepTemplatesDir(root)
+            if (req.method === 'GET') {
+              const name = url.searchParams.get('name')
+              if (name) {
+                const clean = sanitiseAgentName(name)
+                if (!clean) return json(res, 400, { error: 'invalid name' })
+                try {
+                  const raw = await fs.readFile(path.join(tplDir, `${clean}.json`), 'utf8')
+                  return json(res, 200, { name: clean, template: JSON.parse(raw) })
+                } catch {
+                  return json(res, 404, { error: 'not found' })
+                }
+              }
+              await fs.mkdir(tplDir, { recursive: true })
+              const templates = []
+              for (const entry of await safeReadDir(tplDir)) {
+                if (!entry.isFile() || !entry.name.endsWith('.json')) continue
+                const n = entry.name.replace(/\.json$/, '')
+                try {
+                  const raw = await fs.readFile(path.join(tplDir, entry.name), 'utf8')
+                  const t = JSON.parse(raw)
+                  templates.push({ name: n, title: t.title || n })
+                } catch {
+                  templates.push({ name: n, title: n })
+                }
+              }
+              return json(res, 200, { templates: templates.sort((a, b) => a.name.localeCompare(b.name)) })
+            }
+            if (req.method === 'POST') {
+              let body = ''
+              for await (const chunk of req) body += chunk
+              let parsed
+              try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+              const template = parsed.template || parsed
+              const clean = sanitiseAgentName(template.name || parsed.name)
+              if (!clean) return json(res, 400, { error: 'invalid template name' })
+              const payload = {
+                name: clean,
+                title: template.title || clean,
+                body: template.body || '',
+                pipeline_step_id: template.pipeline_step_id || '',
+              }
+              await fs.mkdir(tplDir, { recursive: true })
+              await fs.writeFile(path.join(tplDir, `${clean}.json`), JSON.stringify(payload, null, 2), 'utf8')
+              return json(res, 200, { saved: true, name: clean })
+            }
+            if (req.method === 'DELETE') {
+              const name = sanitiseAgentName(url.searchParams.get('name') || '')
+              if (!name) return json(res, 400, { error: 'invalid name' })
+              try {
+                await fs.unlink(path.join(tplDir, `${name}.json`))
                 return json(res, 200, { deleted: true, name })
               } catch {
                 return json(res, 404, { error: 'not found' })

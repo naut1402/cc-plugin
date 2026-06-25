@@ -47,6 +47,12 @@ export async function fetchCatalog() {
   return r.json()
 }
 
+export async function fetchCatalogAgent(id) {
+  const r = await fetch(`/api/catalog-agent?id=${encodeURIComponent(id)}`)
+  if (!r.ok) throw new Error(`/api/catalog-agent → ${r.status}`)
+  return r.json()
+}
+
 export async function fetchRules() {
   const r = await fetch('/api/rules')
   if (!r.ok) throw new Error(`/api/rules → ${r.status}`)
@@ -185,6 +191,34 @@ export async function uploadAgentTemplate(file) {
 export async function deleteAgentTemplate(name) {
   const r = await fetch(`/api/agent-templates?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
   if (!r.ok) throw new Error(`/api/agent-templates DELETE → ${r.status}`)
+  return r.json()
+}
+
+export async function fetchWorkflowStepTemplates() {
+  const r = await fetch('/api/workflow-step-templates')
+  if (!r.ok) throw new Error(`/api/workflow-step-templates → ${r.status}`)
+  return r.json()
+}
+
+export async function fetchWorkflowStepTemplate(name) {
+  const r = await fetch(`/api/workflow-step-templates?name=${encodeURIComponent(name)}`)
+  if (!r.ok) throw new Error(`/api/workflow-step-templates?name=${name} → ${r.status}`)
+  return r.json()
+}
+
+export async function saveWorkflowStepTemplate(template) {
+  const r = await fetch('/api/workflow-step-templates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ template }),
+  })
+  if (!r.ok) throw new Error(`/api/workflow-step-templates POST → ${r.status}`)
+  return r.json()
+}
+
+export async function deleteWorkflowStepTemplate(name) {
+  const r = await fetch(`/api/workflow-step-templates?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(`/api/workflow-step-templates DELETE → ${r.status}`)
   return r.json()
 }
 

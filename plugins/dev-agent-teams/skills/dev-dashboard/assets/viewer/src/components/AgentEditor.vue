@@ -12,7 +12,6 @@ import { emptyDraft } from '../lib/agentMarkdown.js'
 import AgentSectionEditor from './AgentSectionEditor.vue'
 import AgentTemplatePicker from './AgentTemplatePicker.vue'
 import AgentNlWizard from './AgentNlWizard.vue'
-import WorkflowStepPicker from './WorkflowStepPicker.vue'
 
 const agents = ref([])
 const catalog = ref({ skills: [], agents: [] })
@@ -173,12 +172,13 @@ function applyDraft(newDraft) {
         </label>
       </div>
 
-      <WorkflowStepPicker
-        :model-value="draft.workflow_steps"
-        @update:model-value="draft.workflow_steps = $event"
+      <AgentSectionEditor
+        :draft="draft"
+        :catalog="catalog"
+        @update:draft="draft = $event"
+        @message="message = $event; error = ''"
+        @error="error = $event; message = ''"
       />
-
-      <AgentSectionEditor :draft="draft" :catalog="catalog" @update:draft="draft = $event" />
     </div>
   </div>
 </template>

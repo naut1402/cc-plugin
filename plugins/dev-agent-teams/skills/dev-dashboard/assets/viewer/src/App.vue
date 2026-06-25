@@ -5,6 +5,17 @@ import TaskList from './components/TaskList.vue'
 import PipelineView from './components/PipelineView.vue'
 import QaPanel from './components/QaPanel.vue'
 import ArtifactPanel from './components/ArtifactPanel.vue'
+import PipelineEditor from './components/PipelineEditor.vue'
+
+// ── Mode ─────────────────────────────────────────────────────────────────────
+// 'monitor' → existing read-only dashboard (default)
+// 'editor'  → new pipeline editor
+const mode = ref('monitor')
+
+// Editor scope: 'global' edits .dev-team-agent/pipeline.yaml,
+// 'task' edits tasks/<editorTaskId>/pipeline.yaml.
+const editorScope = ref('global')
+const editorTaskId = ref('')
 
 const POLL_MS = 1500
 
@@ -50,6 +61,15 @@ function handleOpenArtifact({ taskId, name }) {
   openArtifact.value = { taskId, name }
 }
 
+// Pause polling when in editor mode to avoid stale state overwrites.
+watch(mode, (m) => {
+  clearInterval(timer)
+  if (m === 'monitor') {
+    poll()
+    timer = setInterval(poll, POLL_MS)
+  }
+})
+
 onMounted(() => {
   poll()
   timer = setInterval(poll, POLL_MS)
@@ -58,27 +78,62 @@ onUnmounted(() => clearInterval(timer))
 </script>
 
 <template>
-  <div class="layout">
+  <div class="layout" :class="{ 'layout-editor': mode === 'editor' }">
     <aside class="sidebar">
       <header class="brand">
         <h1>Dev Team</h1>
         <span class="dot" :class="{ live: connected }" :title="connected ? 'live' : 'disconnected'"></span>
       </header>
       <p class="root" :title="root">{{ root || '…' }}</p>
+
+      <!-- Mode toggle -->
+      <div class="mode-toggle">
+        <button
+          class="mode-btn"
+          :class="{ active: mode === 'monitor' }"
+          @click="mode = 'monitor'"
+        >Monitor</button>
+        <button
+          class="mode-btn"
+          :class="{ active: mode === 'editor' }"
+          @click="mode = 'editor'"
+        >Pipeline Editor</button>
+      </div>
+
+      <!-- Editor scope selector (only in editor mode) -->
+      <div v-if="mode === 'editor'" class="editor-scope">
+        <label class="scope-label">Scope:</label>
+        <select v-model="editorScope" class="scope-select">
+          <option value="global">Global pipeline.yaml</option>
+          <option value="task">Per-task</option>
+        </select>
+        <input
+          v-if="editorScope === 'task'"
+          v-model="editorTaskId"
+          class="scope-task-input"
+          placeholder="Task ID"
+        />
+      </div>
+
+      <!-- Task list (monitor mode only) -->
       <TaskList
+        v-if="mode === 'monitor'"
         :tasks="tasks"
         :selected-id="selectedId"
         :open-artifact="openArtifact"
         @select="selectedId = $event"
         @open-artifact="handleOpenArtifact"
       />
+
       <footer class="status">
         <span v-if="error" class="err">⚠ {{ error }}</span>
-        <span v-else-if="lastUpdated">cập nhật {{ lastUpdated }}</span>
+        <span v-else-if="lastUpdated && mode === 'monitor'">cập nhật {{ lastUpdated }}</span>
+        <span v-else-if="mode === 'editor'" class="muted">editor mode — polling paused</span>
       </footer>
     </aside>
 
-    <main class="main">
+    <!-- Monitor mode: existing dashboard -->
+    <main v-if="mode === 'monitor'" class="main">
       <template v-if="selected">
         <div class="task-head">
           <h2>
@@ -110,6 +165,14 @@ onUnmounted(() => clearInterval(timer))
         <p v-else-if="!connected">Đang kết nối tới dev server…</p>
         <p v-else>Chọn một task ở bên trái.</p>
       </div>
+    </main>
+
+    <!-- Editor mode: pipeline editor -->
+    <main v-else class="main main-editor">
+      <PipelineEditor
+        :scope="editorScope"
+        :task-id="editorTaskId"
+      />
     </main>
   </div>
 </template>

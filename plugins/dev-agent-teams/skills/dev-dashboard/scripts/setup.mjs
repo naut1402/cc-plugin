@@ -28,6 +28,7 @@ function log(msg) {
 }
 
 fs.mkdirSync(dta, { recursive: true })
+fs.mkdirSync(path.join(dta, 'pipeline-profiles'), { recursive: true })
 
 // 2. Migrate legacy layout.
 for (const dir of ['tasks', '.dev-state']) {

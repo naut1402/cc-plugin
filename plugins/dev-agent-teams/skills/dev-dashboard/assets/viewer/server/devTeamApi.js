@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
 import yaml from 'js-yaml'
+import { createRegistryContext } from './registry.js'
 import {
   parseAgentMarkdown,
   compileAgentMarkdown,
@@ -934,35 +935,77 @@ function flowProfilePath(root, id) {
   return path.join(root, 'flow-profiles', `${id}.json`)
 }
 
-export function devTeamApi({ root }) {
-  const profilePath = path.join(root, 'orchestrator-profile.json')
+// ── Core request handler (shared by Vite middleware + standalone server) ───────
+//
+// `createApiHandler(ctx)` returns an async (req, res) => boolean handler. It
+// returns `true` when it produced a response (the request was an /api/* route)
+// and `false` when the request is not an API request (caller should fall
+// through to static serving / next middleware).
+//
+// ctx = { resolveProjectRoot(projectId), registry, defaultRoot }. Each handler
+// reads `?project=<id>` and resolves the per-request `.dev-team-agent/` root via
+// ctx.resolveProjectRoot, replacing the old frozen `root` closure (design §4.3).
+export function createApiHandler(ctx) {
+  const { resolveProjectRoot, registry } = ctx
 
-  return {
-    name: 'dev-team-api',
-    configureServer(server) {
-      // Surface the resolved root once at startup so it's obvious what's served.
-      const exists = fsSync.existsSync(root)
-      server.config.logger.info(
-        `\n  dev-team-dashboard → root: ${root}${exists ? '' : '  (does not exist yet)'}\n`,
-      )
+  // Dispatch an /api/* request. Every branch ends with `return json(...)`, and
+  // the final fall-through returns a 404 — so this always produces a response.
+  async function dispatch(req, res, url) {
+    // Resolve the project root for this request. `projectId` may be null
+    // (→ default project). Returns null when an explicit id is unknown.
+    const projectId = url.searchParams.get('project') || null
+    const root = resolveProjectRoot(projectId)
+    const profilePath = root ? path.join(root, 'orchestrator-profile.json') : null
+    const unknownProject = () => json(res, 404, { error: 'unknown project', project: projectId })
 
-      server.middlewares.use(async (req, res, next) => {
-        const url = new URL(req.url, 'http://localhost')
-        if (!url.pathname.startsWith('/api/')) return next()
+    // ── Project registry CRUD (no per-project root needed) ───────────────
+    if (url.pathname === '/api/projects') {
+      if (req.method === 'GET') {
+        const id = url.searchParams.get('id')
+        if (id) {
+          const project = registry.get(id)
+          if (!project) return json(res, 404, { error: 'unknown project', id })
+          return json(res, 200, { project })
+        }
+        return json(res, 200, registry.list())
+      }
+      if (req.method === 'POST') {
+        let body = ''
+        for await (const chunk of req) body += chunk
+        let parsed
+        try { parsed = JSON.parse(body || '{}') } catch { return json(res, 400, { error: 'invalid JSON' }) }
+        const result = registry.add({ path: parsed.path, name: parsed.name })
+        if (!result.ok) return json(res, result.status || 400, { error: result.error })
+        return json(res, 201, { project: result.project })
+      }
+      if (req.method === 'DELETE') {
+        const id = url.searchParams.get('id') || ''
+        const result = registry.remove(id)
+        if (!result.ok) return json(res, result.status || 400, { error: result.error })
+        return json(res, 200, { removed: true })
+      }
+      return json(res, 405, { error: 'method not allowed' })
+    }
 
-        try {
-          if (url.pathname === '/api/tasks' && req.method === 'GET') {
-            return json(res, 200, { root, tasks: await collectTasks(root) })
-          }
+    if (url.pathname === '/api/tasks' && req.method === 'GET') {
+      if (!root) return unknownProject()
+      // Backward-compat: shape is { root, tasks }. When a project was
+      // explicitly requested, also surface its id.
+      const payload = { root, tasks: await collectTasks(root) }
+      if (projectId) payload.project = projectId
+      return json(res, 200, payload)
+    }
 
-          // Resolved pipeline config for a task (or global when no id).
-          if (url.pathname === '/api/pipeline-config' && req.method === 'GET') {
-            const id = url.searchParams.get('id') || ''
-            const cfg = await loadPipelineConfig(root, id || null)
-            return json(res, 200, { id: id || null, pipeline: cfg })
-          }
+    // Resolved pipeline config for a task (or global when no id).
+    if (url.pathname === '/api/pipeline-config' && req.method === 'GET') {
+      if (!root) return unknownProject()
+      const id = url.searchParams.get('id') || ''
+      const cfg = await loadPipelineConfig(root, id || null)
+      return json(res, 200, { id: id || null, pipeline: cfg })
+    }
 
-          if (url.pathname === '/api/artifact' && req.method === 'GET') {
+    if (url.pathname === '/api/artifact' && req.method === 'GET') {
+      if (!root) return unknownProject()
             const id = url.searchParams.get('id') || ''
             const name = url.searchParams.get('name') || ''
             const target = resolveArtifact(root, id, name)
@@ -977,6 +1020,7 @@ export function devTeamApi({ root }) {
           }
 
           if (url.pathname === '/api/profile') {
+            if (!root) return unknownProject()
             if (req.method === 'GET') {
               try {
                 const raw = await fs.readFile(profilePath, 'utf8')
@@ -993,6 +1037,7 @@ export function devTeamApi({ root }) {
           // Structured phase-summary export (machine-readable, written by orchestrator
           // when --export-json flag is active).
           if (url.pathname === '/api/pipeline-export' && req.method === 'GET') {
+            if (!root) return unknownProject()
             const id = url.searchParams.get('id') || ''
             if (!id) return json(res, 400, { error: 'missing id' })
             const fp = path.join(root, 'tasks', id, 'pipeline-export.json')
@@ -1006,6 +1051,7 @@ export function devTeamApi({ root }) {
 
           // Per-task flow profiles: GET reads, POST creates/updates.
           if (url.pathname === '/api/flow-profile') {
+            if (!root) return unknownProject()
             const id = url.searchParams.get('id') || ''
             if (!id) return json(res, 400, { error: 'missing id' })
             const fp = flowProfilePath(root, id)
@@ -1036,11 +1082,13 @@ export function devTeamApi({ root }) {
 
           // ── Catalog: available skills & agents from installed plugins ──────
           if (url.pathname === '/api/catalog' && req.method === 'GET') {
+            if (!root) return unknownProject()
             const catalog = await buildCatalog(root)
             return json(res, 200, catalog)
           }
 
           if (url.pathname === '/api/catalog-agent' && req.method === 'GET') {
+            if (!root) return unknownProject()
             const id = url.searchParams.get('id')
             if (!id) return json(res, 400, { error: 'missing id' })
             const projectRoot = path.dirname(root)
@@ -1082,12 +1130,14 @@ export function devTeamApi({ root }) {
           }
 
           if (url.pathname === '/api/rules' && req.method === 'GET') {
+            if (!root) return unknownProject()
             const rulesData = await buildRules(root)
             return json(res, 200, rulesData)
           }
 
           // ── Pipeline profiles: named reusable pipeline configs ────────────
           if (url.pathname === '/api/pipeline-profiles') {
+            if (!root) return unknownProject()
             const dir = profilesDir(root)
 
             if (req.method === 'GET') {
@@ -1148,6 +1198,7 @@ export function devTeamApi({ root }) {
 
           // ── Pipeline config write: save global or per-task pipeline.yaml ──
           if (url.pathname === '/api/pipeline-config-write' && req.method === 'POST') {
+            if (!root) return unknownProject()
             let body = ''
             for await (const chunk of req) body += chunk
             let parsed
@@ -1174,6 +1225,7 @@ export function devTeamApi({ root }) {
 
           // ── Custom agents (dashboard-created) ─────────────────────────────
           if (url.pathname === '/api/custom-agents') {
+            if (!root) return unknownProject()
             if (req.method === 'GET') {
               const name = url.searchParams.get('name')
               if (name) {
@@ -1210,6 +1262,7 @@ export function devTeamApi({ root }) {
           }
 
           if (url.pathname === '/api/custom-agents/export' && req.method === 'POST') {
+            if (!root) return unknownProject()
             let body = ''
             for await (const chunk of req) body += chunk
             let parsed
@@ -1233,6 +1286,7 @@ export function devTeamApi({ root }) {
           }
 
           if (url.pathname === '/api/custom-agents/generate' && req.method === 'POST') {
+            if (!root) return unknownProject()
             let body = ''
             for await (const chunk of req) body += chunk
             let parsed
@@ -1243,6 +1297,7 @@ export function devTeamApi({ root }) {
 
           // ── Agent templates ───────────────────────────────────────────────
           if (url.pathname === '/api/agent-templates') {
+            if (!root) return unknownProject()
             await ensureDefaultTemplate(root)
             const tplDir = agentTemplatesDir(root)
             if (req.method === 'GET') {
@@ -1335,6 +1390,7 @@ export function devTeamApi({ root }) {
 
           // ── Workflow step templates (builder) ─────────────────────────────
           if (url.pathname === '/api/workflow-step-templates') {
+            if (!root) return unknownProject()
             const tplDir = workflowStepTemplatesDir(root)
             if (req.method === 'GET') {
               const name = url.searchParams.get('name')
@@ -1394,9 +1450,42 @@ export function devTeamApi({ root }) {
           }
 
           return json(res, 404, { error: 'unknown endpoint' })
-        } catch (err) {
-          return json(res, 500, { error: String(err && err.message ? err.message : err) })
-        }
+  }
+
+  // Public handler: returns true when it handled an /api/* request, false to
+  // let the caller fall through (static files / next middleware).
+  return async function handle(req, res) {
+    const url = new URL(req.url, 'http://localhost')
+    if (!url.pathname.startsWith('/api/')) return false
+    try {
+      await dispatch(req, res, url)
+    } catch (err) {
+      json(res, 500, { error: String(err && err.message ? err.message : err) })
+    }
+    return true
+  }
+}
+
+// Vite plugin wrapper around the shared core handler. Builds a ctx whose
+// default project root is the legacy `root` (cwd/.. or DEV_TEAM_ROOT), then
+// serves /api/* through createApiHandler — so dev mode behaves exactly as
+// before while gaining multi-project support via `?project=`.
+export function devTeamApi({ root }) {
+  const ctx = createRegistryContext({ defaultRoot: root })
+  const apiHandler = createApiHandler(ctx)
+
+  return {
+    name: 'dev-team-api',
+    configureServer(server) {
+      // Surface the resolved default root once at startup.
+      const exists = fsSync.existsSync(root)
+      server.config.logger.info(
+        `\n  dev-team-dashboard → default root: ${root}${exists ? '' : '  (does not exist yet)'}\n`,
+      )
+
+      server.middlewares.use(async (req, res, next) => {
+        const handled = await apiHandler(req, res)
+        if (!handled) return next()
       })
     },
   }

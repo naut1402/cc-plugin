@@ -126,4 +126,14 @@ if (claudeMd.includes(RULES_MARKER)) {
   log('added rule placeholders → CLAUDE.md')
 }
 
-log('done. Next: cd .dev-team-agent/viewer && npm install && npm run dev')
+log('done.')
+log('')
+log('Single-project (legacy) run:')
+log('  cd .dev-team-agent/viewer && npm install && npm run dev')
+log('')
+log('Multi-project (standalone) run — one neutral server pointing at N projects:')
+log('  cd .dev-team-agent/viewer && npm install && npm run build && npm run serve')
+log('  → opens http://127.0.0.1:5174; add each project via the UI sidebar or the')
+log('    MCP `add_project` tool (point it at any `.dev-team-agent/` dir or project root).')
+log('  Registry lives at ~/.dev-team-dashboard/projects.json (override: DEV_TEAM_DASHBOARD_HOME).')
+log('  DEV_TEAM_ROOT, if set, is auto-seeded as the default project.')

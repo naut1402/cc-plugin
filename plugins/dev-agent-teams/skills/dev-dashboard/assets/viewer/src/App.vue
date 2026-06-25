@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { fetchTasks } from './api.js'
+import { fetchTasks, fetchProjects } from './api.js'
 import { useLocalToggle } from './lib/useLocalToggle.js'
 import TaskList from './components/TaskList.vue'
+import ProjectBar from './components/ProjectBar.vue'
 import PipelineView from './components/PipelineView.vue'
 import QaPanel from './components/QaPanel.vue'
 import ArtifactPanel from './components/ArtifactPanel.vue'
@@ -11,6 +12,7 @@ import AgentEditor from './components/AgentEditor.vue'
 import RailIcon from './components/RailIcon.vue'
 
 const SIDEBAR_KEY = 'dev-dashboard-sidebar-collapsed'
+const PROJECT_KEY = 'dev-dashboard-selected-project'
 
 // ── Mode ─────────────────────────────────────────────────────────────────────
 const mode = ref('monitor')
@@ -27,6 +29,12 @@ const POLL_MS = 1500
 const root = ref('')
 const tasks = ref([])
 const selectedId = ref(null)
+
+// Multi-project state. `selectedProjectId` (null = default project) drives which
+// project's tasks the monitor view polls; persisted to localStorage.
+const projects = ref([])
+const defaultProjectId = ref(null)
+const selectedProjectId = ref(loadSelectedProject())
 const error = ref(null)
 const lastUpdated = ref(null)
 const connected = ref(false)
@@ -44,6 +52,47 @@ function loadSidebarPref() {
   } catch { /* ignore */ }
 }
 
+function loadSelectedProject() {
+  try {
+    return localStorage.getItem(PROJECT_KEY) || null
+  } catch {
+    return null
+  }
+}
+
+watch(selectedProjectId, (v) => {
+  try {
+    if (v) localStorage.setItem(PROJECT_KEY, v)
+    else localStorage.removeItem(PROJECT_KEY)
+  } catch { /* ignore */ }
+})
+
+async function loadProjects() {
+  try {
+    const data = await fetchProjects()
+    projects.value = data.projects || []
+    defaultProjectId.value = data.defaultId || null
+    // Drop a stale selection (e.g. project removed in another tab).
+    if (selectedProjectId.value && !projects.value.some((p) => p.id === selectedProjectId.value)) {
+      selectedProjectId.value = null
+    }
+  } catch {
+    // Registry endpoint may be absent in the legacy single-project dev mode —
+    // ignore and fall back to the default project.
+    projects.value = []
+  }
+}
+
+function onSelectProject(id) {
+  selectedProjectId.value = id
+  selectedId.value = null // reset task selection when switching project
+  poll()
+}
+
+function onProjectsChanged() {
+  loadProjects()
+}
+
 watch(sidebarCollapsed, (v) => {
   try {
     localStorage.setItem(SIDEBAR_KEY, v ? '1' : '0')
@@ -52,7 +101,7 @@ watch(sidebarCollapsed, (v) => {
 
 async function poll() {
   try {
-    const data = await fetchTasks()
+    const data = await fetchTasks(selectedProjectId.value)
     root.value = data.root
     tasks.value = data.tasks
     connected.value = true
@@ -108,8 +157,9 @@ watch(mode, async (m) => {
   }
 })
 
-onMounted(() => {
+onMounted(async () => {
   loadSidebarPref()
+  await loadProjects()
   poll()
   timer = setInterval(poll, POLL_MS)
 })
@@ -196,6 +246,15 @@ onUnmounted(() => clearInterval(timer))
         </template>
       </div>
 
+      <ProjectBar
+        v-if="mode === 'monitor' && !sidebarCollapsed"
+        :projects="projects"
+        :default-id="defaultProjectId"
+        :selected-id="selectedProjectId"
+        @select="onSelectProject"
+        @changed="onProjectsChanged"
+      />
+
       <TaskList
         v-if="mode === 'monitor' && !sidebarCollapsed"
         :tasks="tasks"
@@ -234,6 +293,7 @@ onUnmounted(() => clearInterval(timer))
 
         <ArtifactPanel
           :task="selected"
+          :project-id="selectedProjectId"
           :open-artifact="openArtifact && openArtifact.taskId === selected.task_id ? openArtifact : null"
         />
       </template>

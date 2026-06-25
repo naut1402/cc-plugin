@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "dev-team-dashboard": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/skills/dev-dashboard/assets/viewer/mcp/server.mjs"],
+      "env": {
+        "DEV_TEAM_DASHBOARD_HOME": "${DEV_TEAM_DASHBOARD_HOME}"
+      }
+    }
+  }
+}

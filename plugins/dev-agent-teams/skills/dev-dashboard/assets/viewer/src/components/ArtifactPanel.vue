@@ -6,6 +6,7 @@ import { fetchArtifact } from '../api.js'
 const props = defineProps({
   task: { type: Object, required: true },
   openArtifact: { type: Object, default: null }, // { taskId, name }
+  projectId: { type: String, default: null }, // active project (null = default)
 })
 
 const content = ref('')
@@ -36,7 +37,7 @@ async function load(taskId, name) {
   const key = `${taskId}/${name}`
   loadedKey.value = key
   try {
-    const res = await fetchArtifact(taskId, name)
+    const res = await fetchArtifact(taskId, name, props.projectId)
     if (loadedKey.value === key) {
       content.value = res.content
       loadedMtime.value = res.mtime

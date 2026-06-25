@@ -95,7 +95,6 @@ export function emptyDraft(overrides = {}) {
     },
     section_order: [...DEFAULT_SECTION_ORDER],
     section_labels: {},
-    workflow_steps: [],
     ...overrides,
   }
   draft.section_order = ensureSectionOrder(draft)
@@ -130,7 +129,6 @@ export function parseAgentMarkdown(raw, yaml) {
     section_order: Array.isArray(fm.section_order) ? fm.section_order : [...DEFAULT_SECTION_ORDER],
     section_labels:
       fm.section_labels && typeof fm.section_labels === 'object' ? fm.section_labels : {},
-    workflow_steps: Array.isArray(fm.workflow_steps) ? fm.workflow_steps : [],
   })
 
   const sections = { ...draft.sections }
@@ -187,7 +185,6 @@ export function compileAgentMarkdown(draft, yaml) {
     created_by: 'dashboard',
     editable: true,
     section_order: ensureSectionOrder(draft),
-    workflow_steps: draft.workflow_steps || [],
   }
   if (draft.parameters?.length) fm.parameters = draft.parameters
   if (draft.section_labels && Object.keys(draft.section_labels).length) {
@@ -232,7 +229,6 @@ export function draftFromAgentMarkdown(raw, yaml, agentMeta = {}) {
     sections: { ...parsed.sections },
     section_order: [...parsed.section_order],
     section_labels: { ...(parsed.section_labels || {}) },
-    workflow_steps: parsed.workflow_steps ? [...parsed.workflow_steps] : [],
   })
 }
 

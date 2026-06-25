@@ -194,6 +194,34 @@ export async function deleteAgentTemplate(name) {
   return r.json()
 }
 
+export async function fetchWorkflowStepTemplates() {
+  const r = await fetch('/api/workflow-step-templates')
+  if (!r.ok) throw new Error(`/api/workflow-step-templates → ${r.status}`)
+  return r.json()
+}
+
+export async function fetchWorkflowStepTemplate(name) {
+  const r = await fetch(`/api/workflow-step-templates?name=${encodeURIComponent(name)}`)
+  if (!r.ok) throw new Error(`/api/workflow-step-templates?name=${name} → ${r.status}`)
+  return r.json()
+}
+
+export async function saveWorkflowStepTemplate(template) {
+  const r = await fetch('/api/workflow-step-templates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ template }),
+  })
+  if (!r.ok) throw new Error(`/api/workflow-step-templates POST → ${r.status}`)
+  return r.json()
+}
+
+export async function deleteWorkflowStepTemplate(name) {
+  const r = await fetch(`/api/workflow-step-templates?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(`/api/workflow-step-templates DELETE → ${r.status}`)
+  return r.json()
+}
+
 // Fallback pipeline shape used only when a task has no resolved config (e.g.
 // fetch error). Normally phases come from the per-task pipeline config embedded
 // in /api/tasks (see phasesFromPipeline). Order = left→right flow; `hitl` is the

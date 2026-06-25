@@ -8,6 +8,7 @@ import {
 } from '../lib/agentMarkdown.js'
 import { useSortable } from '../lib/useSortable.js'
 import { saveAgentTemplate } from '../api.js'
+import WorkflowSectionEditor from './WorkflowSectionEditor.vue'
 
 const props = defineProps({
   draft: { type: Object, required: true },
@@ -224,7 +225,15 @@ async function saveSectionTemplate(key) {
           </div>
         </div>
         <div v-show="!isCollapsed(key)" class="section-body">
+          <WorkflowSectionEditor
+            v-if="key === 'workflow'"
+            :model-value="draft.sections?.[key] || ''"
+            @update:model-value="updateSection(key, $event)"
+            @message="emit('message', $event)"
+            @error="emit('error', $event)"
+          />
           <textarea
+            v-else
             class="cfg-textarea"
             :value="draft.sections?.[key] || ''"
             rows="4"

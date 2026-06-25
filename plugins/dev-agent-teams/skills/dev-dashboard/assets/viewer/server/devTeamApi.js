@@ -543,6 +543,10 @@ function agentTemplatesDir(root) {
   return path.join(root, 'agent-templates')
 }
 
+function workflowStepTemplatesDir(root) {
+  return path.join(root, 'workflow-step-templates')
+}
+
 async function scanCustomAgents(root) {
   const dir = customAgentsDir(root)
   const agents = []
@@ -643,7 +647,7 @@ async function generateDraftFromNl(description) {
           max_tokens: 2048,
           messages: [{
             role: 'user',
-            content: `Tạo JSON AgentDraft cho agent Claude Code từ mô tả sau. Trả về CHỈ JSON hợp lệ với keys: name, description, model, skills (array), parameters (array of {name, description}), sections (object role/skills/workflow/guardrail/output), section_order, workflow_steps.\n\nMô tả: ${description}`,
+            content: `Tạo JSON AgentDraft cho agent Claude Code từ mô tả sau. Trả về CHỈ JSON hợp lệ với keys: name, description, model, skills (array), parameters (array of {name, description}), sections (object role/skills/workflow/guardrail/output), section_order.\n\nMô tả: ${description}`,
           }],
         }),
         signal: AbortSignal.timeout(60000),
@@ -1322,6 +1326,66 @@ export function devTeamApi({ root }) {
               if (!name) return json(res, 400, { error: 'invalid name' })
               try {
                 await fs.unlink(path.join(tplDir, `${name}.md`))
+                return json(res, 200, { deleted: true, name })
+              } catch {
+                return json(res, 404, { error: 'not found' })
+              }
+            }
+          }
+
+          // ── Workflow step templates (builder) ─────────────────────────────
+          if (url.pathname === '/api/workflow-step-templates') {
+            const tplDir = workflowStepTemplatesDir(root)
+            if (req.method === 'GET') {
+              const name = url.searchParams.get('name')
+              if (name) {
+                const clean = sanitiseAgentName(name)
+                if (!clean) return json(res, 400, { error: 'invalid name' })
+                try {
+                  const raw = await fs.readFile(path.join(tplDir, `${clean}.json`), 'utf8')
+                  return json(res, 200, { name: clean, template: JSON.parse(raw) })
+                } catch {
+                  return json(res, 404, { error: 'not found' })
+                }
+              }
+              await fs.mkdir(tplDir, { recursive: true })
+              const templates = []
+              for (const entry of await safeReadDir(tplDir)) {
+                if (!entry.isFile() || !entry.name.endsWith('.json')) continue
+                const n = entry.name.replace(/\.json$/, '')
+                try {
+                  const raw = await fs.readFile(path.join(tplDir, entry.name), 'utf8')
+                  const t = JSON.parse(raw)
+                  templates.push({ name: n, title: t.title || n })
+                } catch {
+                  templates.push({ name: n, title: n })
+                }
+              }
+              return json(res, 200, { templates: templates.sort((a, b) => a.name.localeCompare(b.name)) })
+            }
+            if (req.method === 'POST') {
+              let body = ''
+              for await (const chunk of req) body += chunk
+              let parsed
+              try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+              const template = parsed.template || parsed
+              const clean = sanitiseAgentName(template.name || parsed.name)
+              if (!clean) return json(res, 400, { error: 'invalid template name' })
+              const payload = {
+                name: clean,
+                title: template.title || clean,
+                body: template.body || '',
+                pipeline_step_id: template.pipeline_step_id || '',
+              }
+              await fs.mkdir(tplDir, { recursive: true })
+              await fs.writeFile(path.join(tplDir, `${clean}.json`), JSON.stringify(payload, null, 2), 'utf8')
+              return json(res, 200, { saved: true, name: clean })
+            }
+            if (req.method === 'DELETE') {
+              const name = sanitiseAgentName(url.searchParams.get('name') || '')
+              if (!name) return json(res, 400, { error: 'invalid name' })
+              try {
+                await fs.unlink(path.join(tplDir, `${name}.json`))
                 return json(res, 200, { deleted: true, name })
               } catch {
                 return json(res, 404, { error: 'not found' })

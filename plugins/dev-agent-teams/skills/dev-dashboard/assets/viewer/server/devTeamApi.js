@@ -7,9 +7,9 @@ import yaml from 'js-yaml'
 
 // Parse YAML frontmatter from a markdown file (content between first --- fences).
 function parseFrontmatter(raw) {
-  const lines = raw.split('\n')
-  if (lines[0].trim() !== '---') return {}
-  const end = lines.indexOf('---', 1)
+  const lines = raw.split(/\r?\n/)
+  if (lines[0]?.trim() !== '---') return {}
+  const end = lines.findIndex((line, i) => i > 0 && line.trim() === '---')
   if (end < 0) return {}
   try {
     return yaml.load(lines.slice(1, end).join('\n')) || {}
@@ -36,7 +36,8 @@ async function findMarketplaceJson(startDir) {
 }
 
 // Scan a plugin source directory for SKILL.md files and agent .md files.
-async function scanPlugin(pluginDir, source, pluginLabel) {
+async function scanPlugin(pluginDir, source, pluginLabel, opts = {}) {
+  const { includeContractSkills = true } = opts
   const pluginName = pluginLabel || path.basename(pluginDir)
   const src = source || `repo:${pluginName}`
   const skills = []
@@ -51,13 +52,15 @@ async function scanPlugin(pluginDir, source, pluginLabel) {
         const raw = await fs.readFile(skillMd, 'utf8')
         const fm = parseFrontmatter(raw)
         if (!fm.name) continue
-        if (fm['user-invocable'] === false) continue
+        const userInvocable = fm['user-invocable'] !== false
+        if (!includeContractSkills && !userInvocable) continue
         skills.push({
           id: `${src}:${fm.name}`,
           name: fm.name,
           plugin: pluginName,
           source: src,
           description: (fm.description || '').slice(0, 140),
+          user_invocable: userInvocable,
         })
       } catch {
         /* skip */
@@ -106,7 +109,8 @@ async function safeReadDir(dir) {
   }
 }
 
-async function scanSkillsFlatDir(skillsRoot, source, pluginLabel) {
+async function scanSkillsFlatDir(skillsRoot, source, pluginLabel, opts = {}) {
+  const { includeContractSkills = true } = opts
   const skills = []
   for (const entry of await safeReadDir(skillsRoot)) {
     if (!entry.isDirectory()) continue
@@ -115,13 +119,15 @@ async function scanSkillsFlatDir(skillsRoot, source, pluginLabel) {
       const raw = await fs.readFile(skillMd, 'utf8')
       const fm = parseFrontmatter(raw)
       if (!fm.name) continue
-      if (fm['user-invocable'] === false) continue
+      const userInvocable = fm['user-invocable'] !== false
+      if (!includeContractSkills && !userInvocable) continue
       skills.push({
         id: `${source}:${fm.name}`,
         name: fm.name,
         plugin: pluginLabel,
         source,
         description: (fm.description || '').slice(0, 140),
+        user_invocable: userInvocable,
       })
     } catch {
       /* skip */
@@ -153,18 +159,25 @@ async function scanAgentsInDir(agentsRoot, source, pluginLabel) {
   return agents
 }
 
-async function scanRepoPlugins(projectRoot) {
+async function scanRepoPlugins(projectRoot, opts = {}) {
   const found = await findMarketplaceJson(projectRoot)
   if (!found) return { skills: [], agents: [] }
+  const enabledNames = opts.enabledPluginNames
   const allSkills = []
   const allAgents = []
   const plugins = Array.isArray(found.data.plugins) ? found.data.plugins : []
   for (const p of plugins) {
     if (!p.source) continue
+    const pluginName = p.name || path.basename(p.source)
+    if (enabledNames && !enabledNames.has(pluginName)) continue
     const pluginDir = path.resolve(found.dir, p.source)
-    const pluginName = path.basename(pluginDir)
     try {
-      const { skills, agents } = await scanPlugin(pluginDir, `repo:${pluginName}`, pluginName)
+      const { skills, agents } = await scanPlugin(
+        pluginDir,
+        `repo:${pluginName}`,
+        pluginName,
+        opts,
+      )
       allSkills.push(...skills)
       allAgents.push(...agents)
     } catch {
@@ -174,7 +187,7 @@ async function scanRepoPlugins(projectRoot) {
   return { skills: allSkills, agents: allAgents }
 }
 
-async function scanPluginCache() {
+async function scanPluginCache(opts = {}) {
   const cacheRoot = path.join(homeDir(), '.claude', 'plugins', 'cache')
   const allSkills = []
   const allAgents = []
@@ -200,6 +213,7 @@ async function scanPluginCache() {
         versionDir,
         `plugin:${plugin.name}`,
         plugin.name,
+        opts,
       )
       allSkills.push(...skills)
       allAgents.push(...agents)
@@ -208,9 +222,64 @@ async function scanPluginCache() {
   return { skills: allSkills, agents: allAgents }
 }
 
-async function scanUserSkills() {
+// Installed + enabled Claude Code plugins (`installed_plugins.json` + `settings.json`).
+async function loadEnabledPluginInstalls() {
+  const claudeDir = path.join(homeDir(), '.claude')
+  let installed = {}
+  let enabled = {}
+  try {
+    const raw = await fs.readFile(path.join(claudeDir, 'plugins', 'installed_plugins.json'), 'utf8')
+    installed = JSON.parse(raw).plugins || {}
+  } catch {
+    return []
+  }
+  try {
+    const raw = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8')
+    enabled = JSON.parse(raw).enabledPlugins || {}
+  } catch {
+    /* all installed treated as enabled when settings missing */
+  }
+
+  const installs = []
+  for (const [pluginKey, entries] of Object.entries(installed)) {
+    if (enabled[pluginKey] === false) continue
+    const list = Array.isArray(entries) ? entries : [entries]
+    for (const entry of list) {
+      if (!entry?.installPath) continue
+      const shortName = pluginKey.split('@')[0]
+      installs.push({ installPath: entry.installPath, pluginKey, name: shortName })
+    }
+  }
+  return installs
+}
+
+async function scanEnabledInstalledPlugins() {
+  const installs = await loadEnabledPluginInstalls()
+  if (!installs.length) return { skills: [], agents: [] }
+
+  const allSkills = []
+  const allAgents = []
+  const catalogOpts = { includeContractSkills: true }
+  for (const { installPath, name } of installs) {
+    try {
+      const { skills, agents } = await scanPlugin(
+        installPath,
+        `plugin:${name}`,
+        name,
+        catalogOpts,
+      )
+      allSkills.push(...skills)
+      allAgents.push(...agents)
+    } catch {
+      /* skip broken install */
+    }
+  }
+  return { skills: allSkills, agents: allAgents }
+}
+
+async function scanUserSkills(opts = {}) {
   const dir = path.join(homeDir(), '.claude', 'skills')
-  return { skills: await scanSkillsFlatDir(dir, 'user', 'user'), agents: [] }
+  return { skills: await scanSkillsFlatDir(dir, 'user', 'user', opts), agents: [] }
 }
 
 async function scanUserAgents() {
@@ -218,16 +287,17 @@ async function scanUserAgents() {
   return { skills: [], agents: await scanAgentsInDir(dir, 'user', 'user') }
 }
 
-async function scanCursorSkills() {
+async function scanCursorSkills(opts = {}) {
   const dir = path.join(homeDir(), '.cursor', 'skills-cursor')
-  return { skills: await scanSkillsFlatDir(dir, 'cursor', 'cursor'), agents: [] }
+  return { skills: await scanSkillsFlatDir(dir, 'cursor', 'cursor', opts), agents: [] }
 }
 
-async function scanProjectClaude(projectRoot) {
+async function scanProjectClaude(projectRoot, opts = {}) {
   const skills = await scanSkillsFlatDir(
     path.join(projectRoot, '.claude', 'skills'),
     'project',
     'project',
+    opts,
   )
   const agents = await scanAgentsInDir(
     path.join(projectRoot, '.claude', 'agents'),
@@ -242,7 +312,7 @@ function sourcePriority(source) {
   if (source === 'user') return 20
   if (source === 'cursor') return 10
   if (typeof source === 'string' && source.startsWith('repo:')) return 40
-  if (typeof source === 'string' && source.startsWith('plugin:')) return 30
+  if (typeof source === 'string' && source.startsWith('plugin:')) return 45
   return 0
 }
 
@@ -280,13 +350,23 @@ const BUILTIN_CATALOG = {
 
 async function buildCatalog(root) {
   const projectRoot = path.dirname(root)
+  const catalogOpts = { includeContractSkills: true }
+  const enabledInstalls = await loadEnabledPluginInstalls()
+  const enabledPluginNames = enabledInstalls.length
+    ? new Set(enabledInstalls.map((i) => i.name))
+    : null
+
   const batches = [
-    await scanCursorSkills(),
-    await scanUserSkills(),
+    await scanEnabledInstalledPlugins(),
+    await scanCursorSkills(catalogOpts),
+    await scanUserSkills(catalogOpts),
     await scanUserAgents(),
-    await scanPluginCache(),
-    await scanRepoPlugins(projectRoot),
-    await scanProjectClaude(projectRoot),
+    ...(enabledInstalls.length ? [] : [await scanPluginCache(catalogOpts)]),
+    await scanRepoPlugins(projectRoot, {
+      ...catalogOpts,
+      enabledPluginNames: enabledPluginNames || undefined,
+    }),
+    await scanProjectClaude(projectRoot, catalogOpts),
   ]
 
   const allSkills = []

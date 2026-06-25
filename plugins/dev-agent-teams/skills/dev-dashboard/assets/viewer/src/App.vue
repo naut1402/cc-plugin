@@ -16,6 +16,9 @@ const mode = ref('monitor')
 // 'task' edits tasks/<editorTaskId>/pipeline.yaml.
 const editorScope = ref('global')
 const editorTaskId = ref('')
+// '__manual__' = nhập task id thủ công; '' = chưa chọn
+const editorTaskSelect = ref('')
+const editorTaskManual = ref('')
 
 const POLL_MS = 1500
 
@@ -61,12 +64,36 @@ function handleOpenArtifact({ taskId, name }) {
   openArtifact.value = { taskId, name }
 }
 
+function onEditorTaskSelectChange() {
+  if (editorTaskSelect.value === '__manual__') {
+    editorTaskId.value = editorTaskManual.value
+  } else {
+    editorTaskId.value = editorTaskSelect.value
+    editorTaskManual.value = ''
+  }
+}
+
+watch(editorTaskManual, (v) => {
+  if (editorTaskSelect.value === '__manual__') editorTaskId.value = v
+})
+
+watch(editorScope, (scope) => {
+  if (scope === 'global') {
+    editorTaskSelect.value = ''
+    editorTaskManual.value = ''
+    editorTaskId.value = ''
+  }
+})
+
 // Pause polling when in editor mode to avoid stale state overwrites.
-watch(mode, (m) => {
+watch(mode, async (m) => {
   clearInterval(timer)
   if (m === 'monitor') {
     poll()
     timer = setInterval(poll, POLL_MS)
+  } else {
+    // Refresh task list once when entering editor (polling paused).
+    await poll()
   }
 })
 
@@ -107,12 +134,25 @@ onUnmounted(() => clearInterval(timer))
           <option value="global">Global pipeline.yaml</option>
           <option value="task">Per-task</option>
         </select>
-        <input
-          v-if="editorScope === 'task'"
-          v-model="editorTaskId"
-          class="scope-task-input"
-          placeholder="Task ID"
-        />
+        <template v-if="editorScope === 'task'">
+          <select
+            v-model="editorTaskSelect"
+            class="scope-select"
+            @change="onEditorTaskSelectChange"
+          >
+            <option value="">— Chọn task —</option>
+            <option v-for="t in tasks" :key="t.task_id" :value="t.task_id">
+              {{ t.task_id }}
+            </option>
+            <option value="__manual__">Nhập thủ công…</option>
+          </select>
+          <input
+            v-if="editorTaskSelect === '__manual__'"
+            v-model="editorTaskManual"
+            class="scope-task-input"
+            placeholder="Task ID"
+          />
+        </template>
       </div>
 
       <!-- Task list (monitor mode only) -->

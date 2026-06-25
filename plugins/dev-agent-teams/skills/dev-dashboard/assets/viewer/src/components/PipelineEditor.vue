@@ -1,11 +1,12 @@
 <script setup>
-import { ref, computed, markRaw, onMounted } from 'vue'
+import { ref, computed, markRaw, onMounted, watch } from 'vue'
 import { VueFlow, useVueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
-import { fetchCatalog, fetchPipelineConfig, writePipelineConfig } from '../api.js'
+import { fetchCatalog, fetchPipelineConfig, fetchRules, writePipelineConfig } from '../api.js'
 import { useLocalToggle } from '../lib/useLocalToggle.js'
 import PipelineEditorNode from './PipelineEditorNode.vue'
 import CatalogPanel from './CatalogPanel.vue'
+import RulesPanel from './RulesPanel.vue'
 import StepConfigPanel from './StepConfigPanel.vue'
 import ProfileManager from './ProfileManager.vue'
 
@@ -25,6 +26,9 @@ const edges = ref([])
 // ── Catalog ───────────────────────────────────────────────────────────────────
 
 const catalog = ref({ skills: [], agents: [] })
+const rulesData = ref({ rules: [], categories: [] })
+const leftTab = ref('catalog') // 'catalog' | 'rules'
+const highlightedCategory = ref(null)
 
 async function loadCatalog() {
   try {
@@ -32,6 +36,27 @@ async function loadCatalog() {
   } catch {
     catalog.value = { skills: [], agents: [], error: true }
   }
+}
+
+async function loadRules() {
+  try {
+    rulesData.value = await fetchRules()
+  } catch {
+    rulesData.value = { rules: [], categories: [] }
+  }
+}
+
+function nodeMatchesHighlight(nodeData) {
+  if (!highlightedCategory.value) return false
+  const rc = nodeData?.rule_category
+  if (!rc) return false
+  if (Array.isArray(rc)) return rc.includes(highlightedCategory.value)
+  return rc === highlightedCategory.value
+}
+
+function onRuleSelect(rule) {
+  highlightedCategory.value =
+    highlightedCategory.value === rule.category ? null : rule.category
 }
 
 // ── Pipeline config ───────────────────────────────────────────────────────────
@@ -79,9 +104,28 @@ onConnect((params) => {
 })
 
 onMounted(async () => {
-  await Promise.all([loadCatalog(), loadConfig()])
+  await Promise.all([loadCatalog(), loadRules(), loadConfig()])
   setTimeout(() => fitView(), 100)
 })
+
+let configDebounce = null
+watch(
+  [() => props.scope, () => props.taskId],
+  () => {
+    closeConfig()
+    clearTimeout(configDebounce)
+    if (props.scope === 'global') {
+      loadConfig()
+      return
+    }
+    if (!props.taskId?.trim()) {
+      nodes.value = []
+      edges.value = []
+      return
+    }
+    configDebounce = setTimeout(() => loadConfig(), 300)
+  },
+)
 
 // ── Drop from catalog onto canvas ─────────────────────────────────────────────
 
@@ -289,6 +333,7 @@ function onProfileLoad(pipeline) {
 // ── Current pipeline (for ProfileManager save) ────────────────────────────────
 
 const currentPipeline = computed(() => buildPipelineFromFlow())
+const currentSteps = computed(() => currentPipeline.value.steps || [])
 </script>
 
 <template>
@@ -320,8 +365,30 @@ const currentPipeline = computed(() => buildPipelineFromFlow())
 
     <!-- 3-column layout -->
     <div class="editor-layout">
-      <!-- Left: catalog -->
-      <CatalogPanel :catalog="catalog" />
+      <!-- Left: catalog + rules -->
+      <div class="editor-left">
+        <div class="editor-left-tabs">
+          <button
+            class="editor-left-tab"
+            :class="{ active: leftTab === 'catalog' }"
+            @click="leftTab = 'catalog'"
+          >Catalog</button>
+          <button
+            class="editor-left-tab"
+            :class="{ active: leftTab === 'rules' }"
+            @click="leftTab = 'rules'"
+          >Rules</button>
+        </div>
+        <CatalogPanel v-if="leftTab === 'catalog'" :catalog="catalog" />
+        <RulesPanel
+          v-else
+          :rules="rulesData.rules"
+          :categories="rulesData.categories"
+          :steps="currentSteps"
+          :highlighted-category="highlightedCategory"
+          @select-rule="onRuleSelect"
+        />
+      </div>
 
       <!-- Center: canvas -->
       <div
@@ -348,6 +415,7 @@ const currentPipeline = computed(() => buildPipelineFromFlow())
               :class="{
                 'node-preview-active': previewing && previewNodeId === nodeProps.id,
                 'node-preview-done': previewing && previewNodeId !== null && topoSort(getNodes, getEdges).indexOf(nodeProps.id) < topoSort(getNodes, getEdges).indexOf(previewNodeId),
+                'node-rule-highlight': nodeMatchesHighlight(nodeProps.data),
               }"
               @edit="openConfig"
               @delete="deleteNode"
@@ -366,6 +434,7 @@ const currentPipeline = computed(() => buildPipelineFromFlow())
         :step-id="selectedNodeId"
         :step="selectedNodeData"
         :catalog="catalog"
+        :rule-categories="rulesData.categories"
         @update="applyStepUpdate"
         @close="closeConfig"
       />

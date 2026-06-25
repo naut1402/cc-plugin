@@ -7,9 +7,9 @@ import yaml from 'js-yaml'
 
 // Parse YAML frontmatter from a markdown file (content between first --- fences).
 function parseFrontmatter(raw) {
-  const lines = raw.split('\n')
-  if (lines[0].trim() !== '---') return {}
-  const end = lines.indexOf('---', 1)
+  const lines = raw.split(/\r?\n/)
+  if (lines[0]?.trim() !== '---') return {}
+  const end = lines.findIndex((line, i) => i > 0 && line.trim() === '---')
   if (end < 0) return {}
   try {
     return yaml.load(lines.slice(1, end).join('\n')) || {}
@@ -36,12 +36,13 @@ async function findMarketplaceJson(startDir) {
 }
 
 // Scan a plugin source directory for SKILL.md files and agent .md files.
-async function scanPlugin(pluginDir) {
-  const pluginName = path.basename(pluginDir)
+async function scanPlugin(pluginDir, source, pluginLabel, opts = {}) {
+  const { includeContractSkills = true } = opts
+  const pluginName = pluginLabel || path.basename(pluginDir)
+  const src = source || `repo:${pluginName}`
   const skills = []
   const agents = []
 
-  // Skills: plugins/<name>/skills/*/SKILL.md
   const skillsDir = path.join(pluginDir, 'skills')
   try {
     for (const entry of await fs.readdir(skillsDir, { withFileTypes: true })) {
@@ -51,23 +52,24 @@ async function scanPlugin(pluginDir) {
         const raw = await fs.readFile(skillMd, 'utf8')
         const fm = parseFrontmatter(raw)
         if (!fm.name) continue
-        // Skip contract skills (user-invocable: false)
-        if (fm['user-invocable'] === false) continue
+        const userInvocable = fm['user-invocable'] !== false
+        if (!includeContractSkills && !userInvocable) continue
         skills.push({
-          id: `${pluginName}:${fm.name}`,
+          id: `${src}:${fm.name}`,
           name: fm.name,
           plugin: pluginName,
+          source: src,
           description: (fm.description || '').slice(0, 140),
+          user_invocable: userInvocable,
         })
       } catch {
-        /* skip missing files */
+        /* skip */
       }
     }
   } catch {
     /* no skills dir */
   }
 
-  // Agents: plugins/<name>/agents/*.md
   const agentsDir = path.join(pluginDir, 'agents')
   try {
     for (const entry of await fs.readdir(agentsDir, { withFileTypes: true })) {
@@ -77,9 +79,10 @@ async function scanPlugin(pluginDir) {
         const raw = await fs.readFile(path.join(agentsDir, entry.name), 'utf8')
         const fm = parseFrontmatter(raw)
         agents.push({
-          id: `${pluginName}:${agentName}`,
+          id: `${src}:${agentName}`,
           name: agentName,
           plugin: pluginName,
+          source: src,
           description: (fm.description || '').slice(0, 140),
           skills: Array.isArray(fm.skills) ? fm.skills : [],
         })
@@ -94,51 +97,347 @@ async function scanPlugin(pluginDir) {
   return { skills, agents }
 }
 
-// Built-in fallback catalog when marketplace.json is not found.
-const BUILTIN_CATALOG = {
-  skills: [
-    { id: 'dev-agent-teams:survey-codebase', name: 'survey-codebase', plugin: 'dev-agent-teams', description: 'Survey codebase, trace call chains' },
-    { id: 'dev-agent-teams:write-design', name: 'write-design', plugin: 'dev-agent-teams', description: 'Write design documentation' },
-    { id: 'dev-agent-teams:coding-rules', name: 'coding-rules', plugin: 'dev-agent-teams', description: 'Apply coding conventions' },
-    { id: 'dev-agent-teams:run-phpstan', name: 'run-phpstan', plugin: 'dev-agent-teams', description: 'Run PHPStan static analysis' },
-    { id: 'dev-agent-teams:write-tests', name: 'write-tests', plugin: 'dev-agent-teams', description: 'Write test specifications' },
-    { id: 'dev-agent-teams:create-pr', name: 'create-pr', plugin: 'dev-agent-teams', description: 'Create pull request' },
-    { id: 'dev-agent-teams:doc-review', name: 'doc-review', plugin: 'dev-agent-teams', description: 'Review documentation quality' },
-  ],
-  agents: [
-    { id: 'dev-agent-teams:investigator', name: 'investigator', plugin: 'dev-agent-teams', description: 'Survey codebase, trace call chains from entry point', skills: ['survey-codebase'] },
-    { id: 'dev-agent-teams:designer', name: 'designer', plugin: 'dev-agent-teams', description: 'Write design documentation', skills: ['write-design'] },
-    { id: 'dev-agent-teams:implementer', name: 'implementer', plugin: 'dev-agent-teams', description: 'Implement code changes, run PHPStan', skills: ['coding-rules', 'run-phpstan'] },
-    { id: 'dev-agent-teams:reviewer', name: 'reviewer', plugin: 'dev-agent-teams', description: 'Review code quality, create test spec', skills: ['coding-rules', 'write-tests'] },
-    { id: 'dev-agent-teams:pr-creator', name: 'pr-creator', plugin: 'dev-agent-teams', description: 'Create PR description, amend commit', skills: ['create-pr'] },
-    { id: 'dev-agent-teams:doc-reviewer', name: 'doc-reviewer', plugin: 'dev-agent-teams', description: 'Review document quality', skills: ['doc-review'] },
-  ],
+function homeDir() {
+  return process.env.USERPROFILE || process.env.HOME || ''
 }
 
-async function buildCatalog(root) {
-  // Find marketplace.json relative to the project root (parent of .dev-team-agent/).
-  const projectRoot = path.dirname(root)
-  const found = await findMarketplaceJson(projectRoot)
-  if (!found) return BUILTIN_CATALOG
+async function safeReadDir(dir) {
+  try {
+    return await fs.readdir(dir, { withFileTypes: true })
+  } catch {
+    return []
+  }
+}
 
+async function scanSkillsFlatDir(skillsRoot, source, pluginLabel, opts = {}) {
+  const { includeContractSkills = true } = opts
+  const skills = []
+  for (const entry of await safeReadDir(skillsRoot)) {
+    if (!entry.isDirectory()) continue
+    const skillMd = path.join(skillsRoot, entry.name, 'SKILL.md')
+    try {
+      const raw = await fs.readFile(skillMd, 'utf8')
+      const fm = parseFrontmatter(raw)
+      if (!fm.name) continue
+      const userInvocable = fm['user-invocable'] !== false
+      if (!includeContractSkills && !userInvocable) continue
+      skills.push({
+        id: `${source}:${fm.name}`,
+        name: fm.name,
+        plugin: pluginLabel,
+        source,
+        description: (fm.description || '').slice(0, 140),
+        user_invocable: userInvocable,
+      })
+    } catch {
+      /* skip */
+    }
+  }
+  return skills
+}
+
+async function scanAgentsInDir(agentsRoot, source, pluginLabel) {
+  const agents = []
+  for (const entry of await safeReadDir(agentsRoot)) {
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue
+    const agentName = entry.name.replace(/\.md$/, '')
+    try {
+      const raw = await fs.readFile(path.join(agentsRoot, entry.name), 'utf8')
+      const fm = parseFrontmatter(raw)
+      agents.push({
+        id: `${source}:${agentName}`,
+        name: agentName,
+        plugin: pluginLabel,
+        source,
+        description: (fm.description || '').slice(0, 140),
+        skills: Array.isArray(fm.skills) ? fm.skills : [],
+      })
+    } catch {
+      /* skip */
+    }
+  }
+  return agents
+}
+
+async function scanRepoPlugins(projectRoot, opts = {}) {
+  const found = await findMarketplaceJson(projectRoot)
+  if (!found) return { skills: [], agents: [] }
+  const enabledNames = opts.enabledPluginNames
   const allSkills = []
   const allAgents = []
   const plugins = Array.isArray(found.data.plugins) ? found.data.plugins : []
   for (const p of plugins) {
     if (!p.source) continue
+    const pluginName = p.name || path.basename(p.source)
+    if (enabledNames && !enabledNames.has(pluginName)) continue
     const pluginDir = path.resolve(found.dir, p.source)
     try {
-      const { skills, agents } = await scanPlugin(pluginDir)
+      const { skills, agents } = await scanPlugin(
+        pluginDir,
+        `repo:${pluginName}`,
+        pluginName,
+        opts,
+      )
       allSkills.push(...skills)
       allAgents.push(...agents)
     } catch {
-      /* skip inaccessible plugin */
+      /* skip */
     }
   }
-  return {
-    skills: allSkills.length ? allSkills : BUILTIN_CATALOG.skills,
-    agents: allAgents.length ? allAgents : BUILTIN_CATALOG.agents,
+  return { skills: allSkills, agents: allAgents }
+}
+
+async function scanPluginCache(opts = {}) {
+  const cacheRoot = path.join(homeDir(), '.claude', 'plugins', 'cache')
+  const allSkills = []
+  const allAgents = []
+  for (const market of await safeReadDir(cacheRoot)) {
+    if (!market.isDirectory()) continue
+    const marketPath = path.join(cacheRoot, market.name)
+    for (const plugin of await safeReadDir(marketPath)) {
+      if (!plugin.isDirectory()) continue
+      const pluginPath = path.join(marketPath, plugin.name)
+      const versions = (await safeReadDir(pluginPath)).filter((e) => e.isDirectory())
+      if (!versions.length) continue
+      let latestDir = versions[0].name
+      let latestMtime = 0
+      for (const v of versions) {
+        const meta = await statSafe(path.join(pluginPath, v.name))
+        if (meta.mtime > latestMtime) {
+          latestMtime = meta.mtime
+          latestDir = v.name
+        }
+      }
+      const versionDir = path.join(pluginPath, latestDir)
+      const { skills, agents } = await scanPlugin(
+        versionDir,
+        `plugin:${plugin.name}`,
+        plugin.name,
+        opts,
+      )
+      allSkills.push(...skills)
+      allAgents.push(...agents)
+    }
   }
+  return { skills: allSkills, agents: allAgents }
+}
+
+// Installed + enabled Claude Code plugins (`installed_plugins.json` + `settings.json`).
+async function loadEnabledPluginInstalls() {
+  const claudeDir = path.join(homeDir(), '.claude')
+  let installed = {}
+  let enabled = {}
+  try {
+    const raw = await fs.readFile(path.join(claudeDir, 'plugins', 'installed_plugins.json'), 'utf8')
+    installed = JSON.parse(raw).plugins || {}
+  } catch {
+    return []
+  }
+  try {
+    const raw = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8')
+    enabled = JSON.parse(raw).enabledPlugins || {}
+  } catch {
+    /* all installed treated as enabled when settings missing */
+  }
+
+  const installs = []
+  for (const [pluginKey, entries] of Object.entries(installed)) {
+    if (enabled[pluginKey] === false) continue
+    const list = Array.isArray(entries) ? entries : [entries]
+    for (const entry of list) {
+      if (!entry?.installPath) continue
+      const shortName = pluginKey.split('@')[0]
+      installs.push({ installPath: entry.installPath, pluginKey, name: shortName })
+    }
+  }
+  return installs
+}
+
+async function scanEnabledInstalledPlugins() {
+  const installs = await loadEnabledPluginInstalls()
+  if (!installs.length) return { skills: [], agents: [] }
+
+  const allSkills = []
+  const allAgents = []
+  const catalogOpts = { includeContractSkills: true }
+  for (const { installPath, name } of installs) {
+    try {
+      const { skills, agents } = await scanPlugin(
+        installPath,
+        `plugin:${name}`,
+        name,
+        catalogOpts,
+      )
+      allSkills.push(...skills)
+      allAgents.push(...agents)
+    } catch {
+      /* skip broken install */
+    }
+  }
+  return { skills: allSkills, agents: allAgents }
+}
+
+async function scanUserSkills(opts = {}) {
+  const dir = path.join(homeDir(), '.claude', 'skills')
+  return { skills: await scanSkillsFlatDir(dir, 'user', 'user', opts), agents: [] }
+}
+
+async function scanUserAgents() {
+  const dir = path.join(homeDir(), '.claude', 'agents')
+  return { skills: [], agents: await scanAgentsInDir(dir, 'user', 'user') }
+}
+
+async function scanCursorSkills(opts = {}) {
+  const dir = path.join(homeDir(), '.cursor', 'skills-cursor')
+  return { skills: await scanSkillsFlatDir(dir, 'cursor', 'cursor', opts), agents: [] }
+}
+
+async function scanProjectClaude(projectRoot, opts = {}) {
+  const skills = await scanSkillsFlatDir(
+    path.join(projectRoot, '.claude', 'skills'),
+    'project',
+    'project',
+    opts,
+  )
+  const agents = await scanAgentsInDir(
+    path.join(projectRoot, '.claude', 'agents'),
+    'project',
+    'project',
+  )
+  return { skills, agents }
+}
+
+function sourcePriority(source) {
+  if (source === 'project') return 50
+  if (source === 'user') return 20
+  if (source === 'cursor') return 10
+  if (typeof source === 'string' && source.startsWith('repo:')) return 40
+  if (typeof source === 'string' && source.startsWith('plugin:')) return 45
+  return 0
+}
+
+function dedupeCatalogItems(items) {
+  const byName = new Map()
+  for (const item of items) {
+    const existing = byName.get(item.name)
+    if (!existing || sourcePriority(item.source) > sourcePriority(existing.source)) {
+      byName.set(item.name, item)
+    }
+  }
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+// Built-in fallback catalog when marketplace.json is not found.
+const BUILTIN_CATALOG = {
+  skills: [
+    { id: 'repo:dev-agent-teams:survey-codebase', name: 'survey-codebase', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Survey codebase, trace call chains' },
+    { id: 'repo:dev-agent-teams:write-design', name: 'write-design', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Write design documentation' },
+    { id: 'repo:dev-agent-teams:coding-rules', name: 'coding-rules', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Apply coding conventions' },
+    { id: 'repo:dev-agent-teams:run-phpstan', name: 'run-phpstan', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Run PHPStan static analysis' },
+    { id: 'repo:dev-agent-teams:write-tests', name: 'write-tests', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Write test specifications' },
+    { id: 'repo:dev-agent-teams:create-pr', name: 'create-pr', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Create pull request' },
+    { id: 'repo:dev-agent-teams:doc-review', name: 'doc-review', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Review documentation quality' },
+  ],
+  agents: [
+    { id: 'repo:dev-agent-teams:investigator', name: 'investigator', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Survey codebase, trace call chains from entry point', skills: ['survey-codebase'] },
+    { id: 'repo:dev-agent-teams:designer', name: 'designer', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Write design documentation', skills: ['write-design'] },
+    { id: 'repo:dev-agent-teams:implementer', name: 'implementer', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Implement code changes, run PHPStan', skills: ['coding-rules', 'run-phpstan'] },
+    { id: 'repo:dev-agent-teams:reviewer', name: 'reviewer', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Review code quality, create test spec', skills: ['coding-rules', 'write-tests'] },
+    { id: 'repo:dev-agent-teams:pr-creator', name: 'pr-creator', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Create PR description, amend commit', skills: ['create-pr'] },
+    { id: 'repo:dev-agent-teams:doc-reviewer', name: 'doc-reviewer', plugin: 'dev-agent-teams', source: 'repo:dev-agent-teams', description: 'Review document quality', skills: ['doc-review'] },
+  ],
+}
+
+async function buildCatalog(root) {
+  const projectRoot = path.dirname(root)
+  const catalogOpts = { includeContractSkills: true }
+  const enabledInstalls = await loadEnabledPluginInstalls()
+  const enabledPluginNames = enabledInstalls.length
+    ? new Set(enabledInstalls.map((i) => i.name))
+    : null
+
+  const batches = [
+    await scanEnabledInstalledPlugins(),
+    await scanCursorSkills(catalogOpts),
+    await scanUserSkills(catalogOpts),
+    await scanUserAgents(),
+    ...(enabledInstalls.length ? [] : [await scanPluginCache(catalogOpts)]),
+    await scanRepoPlugins(projectRoot, {
+      ...catalogOpts,
+      enabledPluginNames: enabledPluginNames || undefined,
+    }),
+    await scanProjectClaude(projectRoot, catalogOpts),
+  ]
+
+  const allSkills = []
+  const allAgents = []
+  for (const b of batches) {
+    allSkills.push(...(b.skills || []))
+    allAgents.push(...(b.agents || []))
+  }
+
+  const skills = dedupeCatalogItems(allSkills)
+  const agents = dedupeCatalogItems(allAgents)
+
+  if (!skills.length && !agents.length) {
+    return { skills: BUILTIN_CATALOG.skills, agents: BUILTIN_CATALOG.agents }
+  }
+
+  return { skills, agents }
+}
+
+// ── Rules helpers ────────────────────────────────────────────────────────────
+
+const RULE_CATEGORIES = ['coding', 'doc-writing', 'doc-review', 'test', 'git-pr', 'other']
+
+function inferRuleCategory(filePath, fileName) {
+  const lower = `${filePath} ${fileName}`.toLowerCase()
+  if (/coding|convention|style|guideline/.test(lower)) return 'coding'
+  if (/doc-writing|document_writing|investigate|design|writing/.test(lower)) return 'doc-writing'
+  if (/doc-review|code-review/.test(lower)) return 'doc-review'
+  if (/\btest\b|testing|test-spec/.test(lower)) return 'test'
+  if (/git|commit|\bpr\b|branch/.test(lower)) return 'git-pr'
+  return 'other'
+}
+
+async function walkRuleFiles(dir, scope, baseDir, out) {
+  for (const entry of await safeReadDir(dir)) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      await walkRuleFiles(full, scope, baseDir, out)
+      continue
+    }
+    if (!/\.(md|mdc)$/i.test(entry.name)) continue
+    const rel = path.relative(baseDir, full).replace(/\\/g, '/')
+    const name = entry.name.replace(/\.(md|mdc)$/i, '')
+    out.push({
+      id: `${scope}:${rel}`,
+      name,
+      path: rel,
+      scope,
+      category: inferRuleCategory(rel, entry.name),
+    })
+  }
+}
+
+async function buildRules(root) {
+  const projectRoot = path.dirname(root)
+  const rules = []
+
+  await walkRuleFiles(path.join(projectRoot, '.claude', 'rules'), 'project', projectRoot, rules)
+  await walkRuleFiles(path.join(homeDir(), '.cursor', 'rules'), 'global', homeDir(), rules)
+
+  rules.sort(
+    (a, b) =>
+      a.scope.localeCompare(b.scope)
+      || a.category.localeCompare(b.category)
+      || a.name.localeCompare(b.name),
+  )
+
+  const foundCategories = new Set(rules.map((r) => r.category))
+  const categories = RULE_CATEGORIES.filter((c) => foundCategories.has(c))
+
+  return { rules, categories }
 }
 
 // ── Profile helpers ──────────────────────────────────────────────────────────
@@ -504,6 +803,11 @@ export function devTeamApi({ root }) {
           if (url.pathname === '/api/catalog' && req.method === 'GET') {
             const catalog = await buildCatalog(root)
             return json(res, 200, catalog)
+          }
+
+          if (url.pathname === '/api/rules' && req.method === 'GET') {
+            const rulesData = await buildRules(root)
+            return json(res, 200, rulesData)
           }
 
           // ── Pipeline profiles: named reusable pipeline configs ────────────

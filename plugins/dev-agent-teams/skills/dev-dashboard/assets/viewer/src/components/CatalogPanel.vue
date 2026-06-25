@@ -6,16 +6,45 @@ const props = defineProps({
   catalog: { type: Object, required: true }, // { skills: [], agents: [] }
 })
 
-const activeTab = ref('agents') // 'agents' | 'skills'
+const activeTab = ref('agents') // 'agents' | 'skills' | 'rules'
+const sourceFilter = ref('all')
 
-const agentItems = computed(() => props.catalog.agents || [])
-const skillItems = computed(() => props.catalog.skills || [])
+const SOURCE_OPTIONS = [
+  { value: 'all', label: 'All sources' },
+  { value: 'project', label: 'Project' },
+  { value: 'repo', label: 'Repo' },
+  { value: 'plugin', label: 'Plugin' },
+  { value: 'user', label: 'User' },
+  { value: 'cursor', label: 'Cursor' },
+]
+
+function matchesSource(item) {
+  if (sourceFilter.value === 'all') return true
+  const src = item.source || ''
+  if (sourceFilter.value === 'repo') return src.startsWith('repo:')
+  if (sourceFilter.value === 'plugin') return src.startsWith('plugin:')
+  return src === sourceFilter.value
+}
+
+const agentItems = computed(() =>
+  (props.catalog.agents || []).filter(matchesSource),
+)
+const skillItems = computed(() =>
+  (props.catalog.skills || []).filter(matchesSource),
+)
 
 const { query: agentQuery, setQuery: setAgentQuery, filteredItems: filteredAgents } =
-  useSearch(agentItems, (a) => `${a.name} ${a.description} ${a.plugin}`)
+  useSearch(agentItems, (a) => `${a.name} ${a.description} ${a.plugin} ${a.source}`)
 
 const { query: skillQuery, setQuery: setSkillQuery, filteredItems: filteredSkills } =
-  useSearch(skillItems, (s) => `${s.name} ${s.description} ${s.plugin}`)
+  useSearch(skillItems, (s) => `${s.name} ${s.description} ${s.plugin} ${s.source}`)
+
+function sourceBadge(source) {
+  if (!source) return ''
+  if (source.startsWith('repo:')) return source.replace('repo:', 'repo ')
+  if (source.startsWith('plugin:')) return source.replace('plugin:', 'plugin ')
+  return source
+}
 
 function onDragStart(event, item, type) {
   event.dataTransfer.effectAllowed = 'copy'
@@ -42,6 +71,12 @@ function onDragStart(event, item, type) {
       </button>
     </div>
 
+    <select v-model="sourceFilter" class="catalog-source-filter">
+      <option v-for="opt in SOURCE_OPTIONS" :key="opt.value" :value="opt.value">
+        {{ opt.label }}
+      </option>
+    </select>
+
     <!-- Agents tab -->
     <template v-if="activeTab === 'agents'">
       <input
@@ -60,7 +95,9 @@ function onDragStart(event, item, type) {
           :title="agent.description"
         >
           <div class="catalog-item-name">{{ agent.name }}</div>
-          <div class="catalog-item-meta">{{ agent.plugin }}</div>
+          <div class="catalog-item-meta">
+            <span class="source-badge">{{ sourceBadge(agent.source) || agent.plugin }}</span>
+          </div>
           <div v-if="agent.skills?.length" class="catalog-item-skills">
             <span v-for="sk in agent.skills" :key="sk" class="chip chip-xs">{{ sk }}</span>
           </div>
@@ -87,7 +124,9 @@ function onDragStart(event, item, type) {
           :title="skill.description"
         >
           <div class="catalog-item-name">{{ skill.name }}</div>
-          <div class="catalog-item-meta">{{ skill.plugin }}</div>
+          <div class="catalog-item-meta">
+            <span class="source-badge">{{ sourceBadge(skill.source) || skill.plugin }}</span>
+          </div>
           <div v-if="skill.description" class="catalog-item-desc">{{ skill.description }}</div>
         </div>
         <div v-if="!filteredSkills.length" class="catalog-empty">No skills found</div>

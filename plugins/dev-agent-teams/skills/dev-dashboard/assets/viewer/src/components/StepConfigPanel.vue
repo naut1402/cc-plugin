@@ -5,6 +5,7 @@ const props = defineProps({
   stepId: { type: String, default: null },
   step: { type: Object, default: null },  // current step data
   catalog: { type: Object, required: true },
+  ruleCategories: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['update', 'close'])
@@ -136,7 +137,16 @@ function apply() {
       <!-- Rule category -->
       <label class="cfg-label">
         Rule category
-        <input v-model="draft.rule_category" class="cfg-input" placeholder="e.g. doc-writing" />
+        <select v-model="draft.rule_category" class="cfg-input">
+          <option value="">— none —</option>
+          <option v-for="cat in ruleCategories" :key="cat" :value="cat">{{ cat }}</option>
+        </select>
+        <input
+          v-if="!ruleCategories.length"
+          v-model="draft.rule_category"
+          class="cfg-input cfg-input-mt"
+          placeholder="e.g. doc-writing"
+        />
       </label>
 
       <!-- Rule required -->
@@ -194,9 +204,5 @@ function apply() {
       <button class="btn-ghost" @click="emit('close')">Cancel</button>
       <button class="btn-primary" @click="apply">Apply</button>
     </div>
-  </aside>
-
-  <aside class="step-config-panel step-config-empty" v-else>
-    <p>Click ✎ on a node to configure it.</p>
   </aside>
 </template>

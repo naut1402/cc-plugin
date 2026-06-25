@@ -47,6 +47,12 @@ export async function fetchCatalog() {
   return r.json()
 }
 
+export async function fetchRules() {
+  const r = await fetch('/api/rules')
+  if (!r.ok) throw new Error(`/api/rules → ${r.status}`)
+  return r.json()
+}
+
 export async function fetchPipelineProfiles() {
   const r = await fetch('/api/pipeline-profiles')
   if (!r.ok) throw new Error(`/api/pipeline-profiles → ${r.status}`)

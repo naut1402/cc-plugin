@@ -10,7 +10,7 @@ export function useLocalToggle(initial = false) {
   const [state, toggle] = useToggle(initial)
   return {
     state,
-    toggle,
+    toggle: () => { state.value = !state.value },
     setTrue: () => { state.value = true },
     setFalse: () => { state.value = false },
   }

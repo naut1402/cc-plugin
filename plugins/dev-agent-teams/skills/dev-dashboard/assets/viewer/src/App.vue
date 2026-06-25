@@ -7,6 +7,7 @@ import PipelineView from './components/PipelineView.vue'
 import QaPanel from './components/QaPanel.vue'
 import ArtifactPanel from './components/ArtifactPanel.vue'
 import PipelineEditor from './components/PipelineEditor.vue'
+import AgentEditor from './components/AgentEditor.vue'
 import RailIcon from './components/RailIcon.vue'
 
 const SIDEBAR_KEY = 'dev-dashboard-sidebar-collapsed'
@@ -157,6 +158,15 @@ onUnmounted(() => clearInterval(timer))
           <RailIcon name="pipeline" />
           <span v-if="!sidebarCollapsed" class="mode-btn-label">Pipeline Editor</span>
         </button>
+        <button
+          class="mode-btn rail-icon-btn"
+          :class="{ active: mode === 'agentEditor' }"
+          title="Agent Editor"
+          @click="mode = 'agentEditor'"
+        >
+          <RailIcon name="agent" />
+          <span v-if="!sidebarCollapsed" class="mode-btn-label">Agent Editor</span>
+        </button>
       </div>
 
       <div v-if="mode === 'editor' && !sidebarCollapsed" class="editor-scope">
@@ -199,6 +209,7 @@ onUnmounted(() => clearInterval(timer))
         <span v-if="error" class="err">⚠ {{ error }}</span>
         <span v-else-if="lastUpdated && mode === 'monitor'">cập nhật {{ lastUpdated }}</span>
         <span v-else-if="mode === 'editor'" class="muted">editor mode — polling paused</span>
+        <span v-else-if="mode === 'agentEditor'" class="muted">agent editor — polling paused</span>
       </footer>
     </aside>
 
@@ -236,12 +247,16 @@ onUnmounted(() => clearInterval(timer))
       </div>
     </main>
 
-    <main v-else class="main main-editor">
+    <main v-else-if="mode === 'editor'" class="main main-editor">
       <PipelineEditor
         :scope="editorScope"
         :task-id="editorTaskId"
         :app-sidebar-collapsed="sidebarCollapsed"
       />
+    </main>
+
+    <main v-else class="main main-editor">
+      <AgentEditor />
     </main>
   </div>
 </template>

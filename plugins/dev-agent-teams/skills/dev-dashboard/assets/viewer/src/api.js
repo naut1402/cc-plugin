@@ -91,6 +91,103 @@ export async function writePipelineConfig(scope, pipeline, taskId) {
   return r.json()
 }
 
+export async function fetchCustomAgents() {
+  const r = await fetch('/api/custom-agents')
+  if (!r.ok) throw new Error(`/api/custom-agents → ${r.status}`)
+  return r.json()
+}
+
+export async function fetchCustomAgent(name) {
+  const r = await fetch(`/api/custom-agents?name=${encodeURIComponent(name)}`)
+  if (!r.ok) throw new Error(`/api/custom-agents?name=${name} → ${r.status}`)
+  return r.json()
+}
+
+export async function saveCustomAgent(draft) {
+  const r = await fetch('/api/custom-agents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ draft }),
+  })
+  if (!r.ok) throw new Error(`/api/custom-agents POST → ${r.status}`)
+  return r.json()
+}
+
+export async function deleteCustomAgent(name) {
+  const r = await fetch(`/api/custom-agents?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(`/api/custom-agents DELETE → ${r.status}`)
+  return r.json()
+}
+
+export async function exportCustomAgent(name, overwrite = false) {
+  const r = await fetch('/api/custom-agents/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, overwrite }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}))
+    throw new Error(err.error || `/api/custom-agents/export → ${r.status}`)
+  }
+  return r.json()
+}
+
+export async function generateAgentDraft(description) {
+  const r = await fetch('/api/custom-agents/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  })
+  if (!r.ok) throw new Error(`/api/custom-agents/generate → ${r.status}`)
+  return r.json()
+}
+
+export async function fetchAgentTemplates() {
+  const r = await fetch('/api/agent-templates')
+  if (!r.ok) throw new Error(`/api/agent-templates → ${r.status}`)
+  return r.json()
+}
+
+export async function fetchAgentTemplate(name) {
+  const r = await fetch(`/api/agent-templates?name=${encodeURIComponent(name)}`)
+  if (!r.ok) throw new Error(`/api/agent-templates?name=${name} → ${r.status}`)
+  return r.json()
+}
+
+export async function saveAgentTemplate(draft) {
+  const r = await fetch('/api/agent-templates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ draft }),
+  })
+  if (!r.ok) throw new Error(`/api/agent-templates POST → ${r.status}`)
+  return r.json()
+}
+
+export async function importAgentTemplateUrl(url, name) {
+  const r = await fetch('/api/agent-templates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, name }),
+  })
+  if (!r.ok) throw new Error(`/api/agent-templates URL → ${r.status}`)
+  return r.json()
+}
+
+export async function uploadAgentTemplate(file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const r = await fetch('/api/agent-templates', { method: 'POST', body: fd })
+  if (!r.ok) throw new Error(`/api/agent-templates upload → ${r.status}`)
+  return r.json()
+}
+
+export async function deleteAgentTemplate(name) {
+  const r = await fetch(`/api/agent-templates?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(`/api/agent-templates DELETE → ${r.status}`)
+  return r.json()
+}
+
 // Fallback pipeline shape used only when a task has no resolved config (e.g.
 // fetch error). Normally phases come from the per-task pipeline config embedded
 // in /api/tasks (see phasesFromPipeline). Order = left→right flow; `hitl` is the

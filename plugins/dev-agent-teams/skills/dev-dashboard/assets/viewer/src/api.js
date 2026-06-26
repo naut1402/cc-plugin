@@ -330,6 +330,72 @@ export async function uploadKnowledgeFile(file, { scope = 'project', tags = [], 
   return data
 }
 
+// ── Runners & jobs (global) ───────────────────────────────────────────────────
+
+export async function fetchRunners() {
+  const r = await fetch('/api/runners')
+  if (!r.ok) throw new Error(`/api/runners → ${r.status}`)
+  return r.json()
+}
+
+export async function saveRunner(runner) {
+  const r = await fetch('/api/runners', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ runner }),
+  })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(data.error || `/api/runners POST → ${r.status}`)
+  return data
+}
+
+export async function deleteRunner(id) {
+  const r = await fetch(`/api/runners?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(data.error || `/api/runners DELETE → ${r.status}`)
+  return data
+}
+
+export async function setDefaultRunner(id) {
+  const r = await fetch('/api/runners/default', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(data.error || `/api/runners/default → ${r.status}`)
+  return data
+}
+
+export async function fetchCredentials() {
+  const r = await fetch('/api/credentials')
+  if (!r.ok) throw new Error(`/api/credentials → ${r.status}`)
+  return r.json()
+}
+
+export async function submitJob(payload) {
+  const r = await fetch('/api/jobs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(data.error || `/api/jobs POST → ${r.status}`)
+  return data
+}
+
+export async function fetchJob(id) {
+  const r = await fetch(`/api/jobs/${encodeURIComponent(id)}`)
+  if (!r.ok) throw new Error(`/api/jobs/${id} → ${r.status}`)
+  return r.json()
+}
+
+export async function fetchJobs(limit = 10) {
+  const r = await fetch(`/api/jobs?limit=${limit}`)
+  if (!r.ok) throw new Error(`/api/jobs → ${r.status}`)
+  return r.json()
+}
+
 // Fallback pipeline shape used only when a task has no resolved config (e.g.
 // fetch error). Normally phases come from the per-task pipeline config embedded
 // in /api/tasks (see phasesFromPipeline). Order = left→right flow; `hitl` is the

@@ -1,0 +1,48 @@
+# Rule viết tài liệu — cc-plugin
+
+## Ngôn ngữ và văn phong
+
+- Viết bằng **tiếng Việt**.
+- Trình bày **phi ngôn ngữ kỹ thuật** (không dùng thuật ngữ lập trình trong câu mô tả nghiệp vụ khi có thể thay bằng mô tả chức năng).
+- Mỗi khẳng định kỹ thuật phải có **bằng chứng code**: file path, method, line number khi có thể.
+
+## investigate.md — cấu trúc bắt buộc
+
+```markdown
+# Điều tra — <task-id>: <tiêu đề>
+
+## §1. Tổng quan
+## §2. Yêu cầu và acceptance criteria
+## §3. Flow xử lý (text hoặc mermaid)
+## §4. Phạm vi ảnh hưởng
+### 4.1 DB/schema (hoặc "Không có")
+### 4.2 Files cần sửa (bảng: File | Method | Confidence)
+### 4.3 Blast radius
+## §5. Hiện trạng codebase
+## §6. Out of scope
+## §7. Rủi ro và điểm cần xác minh
+```
+
+## design.md — cấu trúc bắt buộc
+
+```markdown
+# Design — <task-id>: <tiêu đề>
+
+## §1. Tổng quan
+## §2. Investigation Summary
+## §3. So sánh giải pháp (bảng)
+## §4. Implementation Details
+### 4.1 Files cần sửa
+### 4.2 Logic thay đổi
+### 4.3 DB changes (nếu có)
+### 4.4 Edge cases
+## §5. Test Notes
+## §6. Out of scope
+## §7. Schedule
+```
+
+## Tiêu chí chất lượng
+
+- So sánh ít nhất 2 giải pháp trong design §3.
+- Ghi rõ MVP vs tương lai khi có phần chưa implement.
+- Không suy đoán không có code evidence.

@@ -3,7 +3,7 @@ defineProps({
   name: {
     type: String,
     required: true,
-    validator: (v) => ['panelCollapse', 'panelExpand', 'monitor', 'pipeline', 'catalog', 'rules', 'agent', 'knowledge'].includes(v),
+    validator: (v) => ['panelCollapse', 'panelExpand', 'monitor', 'pipeline', 'catalog', 'rules', 'agent', 'knowledge', 'runner'].includes(v),
   },
   size: { type: Number, default: 16 },
 })
@@ -63,6 +63,10 @@ defineProps({
       <path d="M3 2.5h10v11H3z" />
       <path d="M5 5.5h6M5 8h6M5 10.5h4" />
       <path d="M11 12.5l2 2" />
+    </template>
+    <template v-else-if="name === 'runner'">
+      <path d="M2 8h3l2-4 4 8 2-4h3" />
+      <circle cx="8" cy="12" r="1.25" fill="currentColor" stroke="none" />
     </template>
   </svg>
 </template>

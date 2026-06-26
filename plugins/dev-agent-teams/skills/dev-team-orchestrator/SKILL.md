@@ -115,11 +115,31 @@ Duyệt `steps` theo thứ tự config, bắt đầu từ `current_phase`.
 Với mỗi step:
 
 1. Cập nhật state: `current_phase = step.id`, `hitl_pending = null`.
-2. Spawn `step.agent` qua Task tool với prompt chứa: task id, parent id nếu có, `step.skills`, `rule_category`, `rule_required`, fallback rule, artifact phải sinh trong `step.produces`, **`knowledge_inputs` bundle** (nếu có), trạng thái `export_json`, và các artifact context hiện có.
+2. **Thực thi agent qua Runner** (ưu tiên) hoặc Task tool (fallback):
+   - Ghi prompt theo template (mục Agent prompt template) vào `.dev-team-agent/tasks/<task-id>/.prompt-<step-id>.txt`.
+   - Chạy:
+
+```bash
+node plugins/dev-agent-teams/skills/dev-dashboard/assets/viewer/server/runner-cli.mjs submit \
+  --task-id <task-id> \
+  --step-id <step.id> \
+  --agent <step.agent> \
+  --workspace .dev-team-agent/tasks/<task-id> \
+  --project-root <repo-root> \
+  --dev-team-root .dev-team-agent \
+  --prompt-file .dev-team-agent/tasks/<task-id>/.prompt-<step-id>.txt \
+  --produces <comma-separated step.produces> \
+  --wait
+```
+
+   - Runner đọc default runner từ `~/.dev-team-dashboard/runners.json`, enqueue job, gọi `RunnerProvider` (`claude-code-cli`).
+   - Nếu job `failed` và lỗi là runner disabled / CLI không tìm thấy → **fallback** spawn `step.agent` qua Task tool với cùng prompt.
+   - Prompt phải chứa: task id, parent id nếu có, `step.skills`, `rule_category`, `rule_required`, fallback rule, artifact `step.produces`, **`knowledge_inputs`** (nếu có), `export_json`, artifact context hiện có.
 3. Sau khi agent kết thúc, kiểm tra `qa.md`. Nếu file mới hoặc thay đổi, chuyển sang Q&A HITL.
-4. Nếu `export_json = true`, merge structured summary vào `pipeline-export.json` dưới `phases[step.export_key]`.
-5. Xử lý `step.hitl` theo section bên dưới.
-6. Chuyển sang step kế tiếp khi gate cho phép.
+4. Kiểm tra `step.produces` artifacts tồn tại và hợp lệ tối thiểu.
+5. Nếu `export_json = true`, merge structured summary vào `pipeline-export.json` dưới `phases[step.export_key]`.
+6. Xử lý `step.hitl` theo section bên dưới.
+7. Chuyển sang step kế tiếp khi gate cho phép.
 
 Không bỏ qua step chỉ vì tên step quen thuộc. Chỉ bỏ qua khi config hoặc subtask inheritance cho phép rõ ràng.
 

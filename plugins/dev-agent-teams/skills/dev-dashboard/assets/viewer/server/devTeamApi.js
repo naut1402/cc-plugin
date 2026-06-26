@@ -5,6 +5,20 @@ import yaml from 'js-yaml'
 import { createRegistryContext } from './registry.js'
 import { handleKnowledgeApi } from './knowledge/knowledgeApi.js'
 import {
+  listRunners,
+  upsertRunner,
+  deleteRunner,
+  setDefaultRunner,
+  listCredentials,
+  upsertCredential,
+  deleteCredential,
+  submitJob,
+  loadJob,
+  listJobs,
+  cancelJob,
+  listProviderIds,
+} from './runners/index.js'
+import {
   parseAgentMarkdown,
   compileAgentMarkdown,
   heuristicDraftFromDescription,
@@ -1008,6 +1022,117 @@ export function createApiHandler(ctx) {
         return json(res, 200, { removed: true })
       }
       return json(res, 405, { error: 'method not allowed' })
+    }
+
+    // ── Runners & credentials (global, not per-project) ─────────────────
+    if (url.pathname === '/api/runners') {
+      if (req.method === 'GET') {
+        return json(res, 200, { ...listRunners(), providers: listProviderIds() })
+      }
+      if (req.method === 'POST') {
+        let body = ''
+        for await (const chunk of req) body += chunk
+        let parsed
+        try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+        const result = upsertRunner(parsed.runner || parsed)
+        if (!result.ok) return json(res, 400, { error: result.error })
+        return json(res, 200, { saved: true, runner: result.runner })
+      }
+      if (req.method === 'DELETE') {
+        const id = url.searchParams.get('id') || ''
+        const result = deleteRunner(id)
+        if (!result.ok) return json(res, result.status || 400, { error: result.error })
+        return json(res, 200, { deleted: true, id })
+      }
+      return json(res, 405, { error: 'method not allowed' })
+    }
+
+    if (url.pathname === '/api/runners/default' && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      let parsed
+      try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+      const result = setDefaultRunner(parsed.id || parsed.runnerId)
+      if (!result.ok) return json(res, result.status || 400, { error: result.error })
+      return json(res, 200, { defaultRunnerId: result.defaultRunnerId })
+    }
+
+    if (url.pathname === '/api/credentials') {
+      if (req.method === 'GET') {
+        return json(res, 200, { profiles: listCredentials() })
+      }
+      if (req.method === 'POST') {
+        let body = ''
+        for await (const chunk of req) body += chunk
+        let parsed
+        try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+        const result = upsertCredential(parsed.profile || parsed)
+        if (!result.ok) return json(res, 400, { error: result.error })
+        return json(res, 200, { saved: true, profile: result.profile })
+      }
+      if (req.method === 'DELETE') {
+        const id = url.searchParams.get('id') || ''
+        const result = deleteCredential(id)
+        if (!result.ok) return json(res, result.status || 400, { error: result.error })
+        return json(res, 200, { deleted: true, id })
+      }
+      return json(res, 405, { error: 'method not allowed' })
+    }
+
+    if (url.pathname === '/api/jobs') {
+      if (req.method === 'GET') {
+        const id = url.searchParams.get('id')
+        if (id) {
+          const job = loadJob(id)
+          if (!job) return json(res, 404, { error: 'not found' })
+          return json(res, 200, { job })
+        }
+        const limit = Number(url.searchParams.get('limit')) || 20
+        return json(res, 200, { jobs: listJobs(limit) })
+      }
+      if (req.method === 'POST') {
+        if (!root) return unknownProject()
+        let body = ''
+        for await (const chunk of req) body += chunk
+        let parsed
+        try { parsed = JSON.parse(body) } catch { return json(res, 400, { error: 'invalid JSON' }) }
+        if (!parsed.agentRef || !parsed.workspace) {
+          return json(res, 400, { error: 'agentRef and workspace are required' })
+        }
+        const projectRoot = path.dirname(root)
+        const job = submitJob({
+          runnerId: parsed.runnerId,
+          agentRef: parsed.agentRef,
+          workspace: path.isAbsolute(parsed.workspace)
+            ? parsed.workspace
+            : path.join(root, parsed.workspace),
+          userPrompt: parsed.userPrompt,
+          promptRef: parsed.promptRef,
+          produces: parsed.produces,
+          metadata: {
+            projectRoot,
+            devTeamRoot: root,
+            ...parsed.metadata,
+          },
+        })
+        return json(res, 201, { job })
+      }
+      return json(res, 405, { error: 'method not allowed' })
+    }
+
+    if (url.pathname.startsWith('/api/jobs/') && url.pathname.endsWith('/cancel') && req.method === 'POST') {
+      const id = url.pathname.slice('/api/jobs/'.length, -'/cancel'.length)
+      const result = cancelJob(id)
+      if (!result.ok) return json(res, result.status || 400, { error: result.error })
+      return json(res, 200, { cancelled: true, id })
+    }
+
+    if (url.pathname.startsWith('/api/jobs/') && req.method === 'GET') {
+      const id = url.pathname.slice('/api/jobs/'.length)
+      if (!id || id.includes('/')) return json(res, 404, { error: 'not found' })
+      const job = loadJob(id)
+      if (!job) return json(res, 404, { error: 'not found' })
+      return json(res, 200, { job })
     }
 
     if (url.pathname === '/api/tasks' && req.method === 'GET') {

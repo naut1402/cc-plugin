@@ -1,0 +1,16 @@
+{
+  "base": "http://localhost:5173",
+  "results": [
+    {
+      "id": "api-module",
+      "pass": true,
+      "note": "runners=1 creds=1"
+    },
+    {
+      "id": "ui-playwright",
+      "pass": true,
+      "note": "skipped (no dev server)"
+    }
+  ],
+  "pass": true
+}

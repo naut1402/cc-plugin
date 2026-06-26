@@ -10,6 +10,7 @@ import ArtifactPanel from './components/ArtifactPanel.vue'
 import PipelineEditor from './components/PipelineEditor.vue'
 import AgentEditor from './components/AgentEditor.vue'
 import KnowledgePanel from './components/KnowledgePanel.vue'
+import RunnerConfigPanel from './components/RunnerConfigPanel.vue'
 import RailIcon from './components/RailIcon.vue'
 
 const SIDEBAR_KEY = 'dev-dashboard-sidebar-collapsed'
@@ -227,6 +228,15 @@ onUnmounted(() => clearInterval(timer))
           <RailIcon name="knowledge" />
           <span v-if="!sidebarCollapsed" class="mode-btn-label">Knowledge</span>
         </button>
+        <button
+          class="mode-btn rail-icon-btn"
+          :class="{ active: mode === 'runner' }"
+          title="Runner Config"
+          @click="mode = 'runner'"
+        >
+          <RailIcon name="runner" />
+          <span v-if="!sidebarCollapsed" class="mode-btn-label">Runner</span>
+        </button>
       </div>
 
       <div v-if="mode === 'editor' && !sidebarCollapsed" class="editor-scope">
@@ -280,6 +290,7 @@ onUnmounted(() => clearInterval(timer))
         <span v-else-if="mode === 'editor'" class="muted">editor mode — polling paused</span>
         <span v-else-if="mode === 'agentEditor'" class="muted">agent editor — polling paused</span>
         <span v-else-if="mode === 'knowledge'" class="muted">knowledge — polling paused</span>
+        <span v-else-if="mode === 'runner'" class="muted">runner config — polling paused</span>
       </footer>
     </aside>
 
@@ -330,7 +341,11 @@ onUnmounted(() => clearInterval(timer))
       <KnowledgePanel />
     </main>
 
-    <main v-else class="main main-editor">
+    <main v-else-if="mode === 'runner'" class="main main-editor">
+      <RunnerConfigPanel />
+    </main>
+
+    <main v-else-if="mode === 'agentEditor'" class="main main-editor">
       <AgentEditor />
     </main>
   </div>

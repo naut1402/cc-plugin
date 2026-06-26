@@ -34,7 +34,7 @@ function emptyRunner() {
     maxConcurrency: 1,
     config: {
       cliPath: 'claude',
-      flags: ['--bare'],
+      flags: [],
       timeoutMs: 600000,
       allowedTools: 'Read,Write,Bash,Grep,Glob',
     },
@@ -141,6 +141,9 @@ async function smokeTest() {
       if (current.status === 'succeeded' || current.status === 'failed') break
     }
     message.value = `Smoke test: ${current.status}${current.error ? ` — ${current.error}` : ''}`
+    if (current.status === 'failed' && current.logPath) {
+      message.value += ` (xem log: ${current.logPath})`
+    }
     await load()
   } catch (e) {
     error.value = String(e.message || e)

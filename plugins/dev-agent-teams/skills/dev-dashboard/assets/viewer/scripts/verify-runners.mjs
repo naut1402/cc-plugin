@@ -43,13 +43,16 @@ async function main() {
 
     await page.getByRole('button', { name: '+ New' }).click()
     await page.waitForTimeout(300)
-    const idInput = page.locator('.runner-form input').first()
-    await idInput.fill('verify-runner-test')
+    const inputs = page.locator('.runner-form input')
+    await inputs.nth(0).fill('verify-runner-test')
+    await inputs.nth(1).fill('Verify Runner Test')
     await page.getByRole('button', { name: 'Lưu' }).click()
-    await page.waitForTimeout(800)
+    await page.waitForTimeout(1200)
 
-    const saved = await page.locator('.runner-list li', { hasText: 'verify-runner-test' }).count()
-    results.push({ id: 'ui-save-runner', pass: saved > 0, note: `saved: ${saved}` })
+    const saved =
+      (await page.locator('.runner-list li', { hasText: 'Verify Runner Test' }).count()) +
+      (await page.locator('.runner-list li', { hasText: 'verify-runner-test' }).count())
+    results.push({ id: 'ui-save-runner', pass: saved > 0, note: `saved matches: ${saved}` })
   } catch (e) {
     const skipped = String(e.message || e).includes('ERR_CONNECTION_REFUSED')
     results.push({

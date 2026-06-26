@@ -36,6 +36,43 @@ async function safeAccess(p) {
   }
 }
 
+async function findInPluginCache(pluginName, fileName) {
+  const cacheRoot = path.join(homeDir(), '.claude', 'plugins', 'cache')
+  let bestPath = null
+  let bestMtime = 0
+  try {
+    const markets = await fs.readdir(cacheRoot, { withFileTypes: true })
+    for (const market of markets) {
+      if (!market.isDirectory()) continue
+      const pluginPath = path.join(cacheRoot, market.name, pluginName)
+      let versions
+      try {
+        versions = await fs.readdir(pluginPath, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const v of versions) {
+        if (!v.isDirectory()) continue
+        const candidate = path.join(pluginPath, v.name, 'agents', fileName)
+        if (!(await safeAccess(candidate))) continue
+        let mtime = 0
+        try {
+          mtime = (await fs.stat(candidate)).mtimeMs
+        } catch {
+          mtime = 0
+        }
+        if (!bestPath || mtime >= bestMtime) {
+          bestPath = candidate
+          bestMtime = mtime
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return bestPath
+}
+
 async function resolveAgentFilePath(projectRoot, devTeamRoot, agentRef) {
   const id = normalizeAgentRef(agentRef)
   const parsed = parseCatalogAgentId(id)
@@ -52,30 +89,12 @@ async function resolveAgentFilePath(projectRoot, devTeamRoot, agentRef) {
   if (source === 'project') {
     return path.join(projectRoot, '.claude', 'agents', fileName)
   }
-  if (source.startsWith('repo:')) {
-    const pluginName = source.slice('repo:'.length)
+  if (source.startsWith('repo:') || source.startsWith('plugin:')) {
+    const pluginName = source.includes(':') ? source.slice(source.indexOf(':') + 1) : source
     const builtin = path.join(projectRoot, 'plugins', pluginName, 'agents', fileName)
     if (await safeAccess(builtin)) return builtin
-  }
-  if (source.startsWith('plugin:')) {
-    const pluginName = source.slice('plugin:'.length)
-    const cacheRoot = path.join(homeDir(), '.claude', 'plugins', 'cache')
-    try {
-      const markets = await fs.readdir(cacheRoot, { withFileTypes: true })
-      for (const market of markets) {
-        if (!market.isDirectory()) continue
-        const pluginPath = path.join(cacheRoot, market.name, pluginName)
-        const versions = await fs.readdir(pluginPath, { withFileTypes: true })
-        if (!versions.length) continue
-        const latest = versions.filter((v) => v.isDirectory()).pop()
-        if (latest) {
-          const candidate = path.join(pluginPath, latest.name, 'agents', fileName)
-          if (await safeAccess(candidate)) return candidate
-        }
-      }
-    } catch {
-      /* ignore */
-    }
+    const cached = await findInPluginCache(pluginName, fileName)
+    if (cached) return cached
   }
   return null
 }

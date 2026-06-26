@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { resolveSecretRef } from '../credentials.js'
 
 function buildPrompt(resolvedAgent, userPrompt) {
   const system = resolvedAgent.systemPrompt?.trim()
@@ -8,14 +9,49 @@ function buildPrompt(resolvedAgent, userPrompt) {
   return `## Agent instructions\n\n${system}\n\n## Task\n\n${userPrompt}`
 }
 
+/** --bare only supports ANTHROPIC_API_KEY; cli-session needs OAuth/keychain. */
+function resolveEffectiveFlags(flags, credential) {
+  const list = Array.isArray(flags) ? [...flags] : []
+  const auth = resolveSecretRef(credential)
+  if (auth.type === 'cli-session') {
+    return list.filter((f) => f !== '--bare')
+  }
+  return list
+}
+
+function buildChildEnv(credential) {
+  const env = { ...process.env }
+  const auth = resolveSecretRef(credential)
+  if (auth.type === 'env' && auth.key && auth.value) {
+    env[auth.key] = auth.value
+  }
+  return env
+}
+
+function formatFailure(procResult, logPath) {
+  const fromStreams = [procResult.stderr, procResult.stdout]
+    .filter(Boolean)
+    .join('\n')
+    .trim()
+  if (fromStreams) return fromStreams.slice(0, 1000)
+  if (logPath && fs.existsSync(logPath)) {
+    const log = fs.readFileSync(logPath, 'utf8').trim()
+    if (log) return log.slice(0, 1000)
+  }
+  if (procResult.killed) return 'process timed out'
+  return `exit code ${procResult.exitCode ?? 'unknown'}`
+}
+
 function runProcess(cliPath, args, options) {
   return new Promise((resolve, reject) => {
     const child = spawn(cliPath, args, {
       cwd: options.cwd,
-      env: { ...process.env, ...options.env },
+      env: options.env,
       shell: process.platform === 'win32',
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     })
+
+    child.stdin?.end()
 
     let stdout = ''
     let stderr = ''
@@ -81,10 +117,10 @@ export function createClaudeCodeCliProvider() {
       }
     },
 
-    async execute(req, runnerConfig, _credential, onLog) {
+    async execute(req, runnerConfig, credential, onLog) {
       const started = Date.now()
       const cliPath = String(runnerConfig.cliPath || 'claude')
-      const flags = Array.isArray(runnerConfig.flags) ? runnerConfig.flags : ['--bare']
+      const flags = resolveEffectiveFlags(runnerConfig.flags, credential)
       const prompt = buildPrompt(req.resolvedAgent, req.userPrompt)
       const args = [...flags, '-p', prompt]
 
@@ -114,6 +150,7 @@ export function createClaudeCodeCliProvider() {
       try {
         procResult = await runProcess(cliPath, args, {
           cwd: req.workspace,
+          env: buildChildEnv(credential),
           timeoutMs: req.timeoutMs || runnerConfig.timeoutMs || 600_000,
           onLog: wrappedOnLog,
         })
@@ -142,11 +179,7 @@ export function createClaudeCodeCliProvider() {
         durationMs: Date.now() - started,
         logPath,
         artifactsFound,
-        error: ok
-          ? undefined
-          : procResult.killed
-            ? 'process timed out'
-            : procResult.stderr?.slice(0, 500) || `exit code ${procResult.exitCode}`,
+        error: ok ? undefined : formatFailure(procResult, logPath),
       }
     },
   }

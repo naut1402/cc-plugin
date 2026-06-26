@@ -21,7 +21,7 @@ function defaultRunners() {
         maxConcurrency: 1,
         config: {
           cliPath: 'claude',
-          flags: ['--bare'],
+          flags: [],
           timeoutMs: 600_000,
           allowedTools: 'Read,Write,Bash,Grep,Glob',
         },

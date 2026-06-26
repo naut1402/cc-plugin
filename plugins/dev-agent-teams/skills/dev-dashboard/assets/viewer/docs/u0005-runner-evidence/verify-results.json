@@ -1,15 +1,20 @@
 {
-  "base": "http://localhost:5173",
+  "base": "http://127.0.0.1:5173",
   "results": [
     {
       "id": "api-module",
       "pass": true,
-      "note": "runners=1 creds=1"
+      "note": "runners=2 creds=1"
     },
     {
-      "id": "ui-playwright",
+      "id": "ui-runner-mode",
       "pass": true,
-      "note": "skipped (no dev server)"
+      "note": "panel: 1"
+    },
+    {
+      "id": "ui-save-runner",
+      "pass": true,
+      "note": "saved matches: 1"
     }
   ],
   "pass": true

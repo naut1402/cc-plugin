@@ -58,7 +58,12 @@ Plugins that need an MCP server include a `.mcp.json` at plugin root:
 }
 ```
 
-Use `${ENV_VAR}` references for runtime values — Claude Code expands these from the process environment. Users set the vars in their shell or under `env` in Claude Code `settings.json`. The `userConfig` fields in `plugin.json` serve as documentation of required config; add `"env": "VAR_NAME"` to link them to the corresponding env var.
+Two ways to inject runtime values:
+
+- **`${user_config.<key>}`** — substituted from the `userConfig` block in `plugin.json` (Claude Code prompts for these on install). This is the preferred mechanism. A `userConfig` field accepts `type`, `title`, `description`, `default`, `sensitive`, `required` — **no `env` key** (the manifest validator rejects unrecognized keys like `"env"`).
+- **`${ENV_VAR}`** — expanded from the process environment; users set the var in their shell or under `env` in Claude Code `settings.json`.
+
+`.cursor-plugin/plugin.json` does **not** carry `userConfig` — Cursor reads its values from env vars instead, so keep the Cursor manifest minimal.
 
 ### SKILL.md frontmatter
 

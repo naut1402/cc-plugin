@@ -2,9 +2,9 @@
   "mcpServers": {
     "dev-team-dashboard": {
       "command": "bun",
-      "args": ["${DEV_TEAM_DASHBOARD_APP}/mcp/server.ts"],
+      "args": ["${user_config.dashboardApp}/mcp/server.ts"],
       "env": {
-        "DEV_TEAM_DASHBOARD_HOME": "${DEV_TEAM_DASHBOARD_HOME}"
+        "DEV_TEAM_DASHBOARD_HOME": "${user_config.dashboardHome}"
       }
     }
   }

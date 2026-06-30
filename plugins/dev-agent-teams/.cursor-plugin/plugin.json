@@ -6,20 +6,5 @@
     "name": "tttuan"
   },
   "license": "Apache-2.0",
-  "skills": ["./skills/"],
-  "userConfig": {
-    "dashboardApp": {
-      "type": "string",
-      "title": "Dashboard app directory",
-      "description": "Local clone of the dashboard app repo (https://github.com/naut1402/agent-workflow). The /dev-dashboard skill clones it here, and the dev-team-dashboard MCP server runs from it. Default: ~/.dev-team-dashboard/app",
-      "default": "~/.dev-team-dashboard/app",
-      "env": "DEV_TEAM_DASHBOARD_APP"
-    },
-    "dashboardHome": {
-      "type": "string",
-      "title": "Dashboard registry home",
-      "description": "Directory holding the multi-project registry (projects.json) and runners.json. Default: ~/.dev-team-dashboard",
-      "env": "DEV_TEAM_DASHBOARD_HOME"
-    }
-  }
+  "skills": ["./skills/"]
 }

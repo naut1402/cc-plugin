@@ -117,10 +117,10 @@ Với mỗi step:
 1. Cập nhật state: `current_phase = step.id`, `hitl_pending = null`.
 2. **Thực thi agent qua Runner** (ưu tiên) hoặc Task tool (fallback):
    - Ghi prompt theo template (mục Agent prompt template) vào `.dev-team-agent/tasks/<task-id>/.prompt-<step-id>.txt`.
-   - Chạy:
+   - Runner CLI nằm trong app dashboard (repo tách riêng [naut1402/agent-workflow](https://github.com/naut1402/agent-workflow)), clone ở `$DEV_TEAM_DASHBOARD_APP` (mặc định `~/.dev-team-dashboard/app`). Chạy `/dev-dashboard` một lần để clone nếu chưa có. Dùng `bun` (runner import nguồn `.ts`):
 
 ```bash
-node plugins/dev-agent-teams/skills/dev-dashboard/assets/viewer/server/runner-cli.mjs submit \
+bun "${DEV_TEAM_DASHBOARD_APP:-~/.dev-team-dashboard/app}/server/runner-cli.mjs" submit \
   --task-id <task-id> \
   --step-id <step.id> \
   --agent <step.agent> \

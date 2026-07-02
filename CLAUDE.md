@@ -58,7 +58,12 @@ Plugins that need an MCP server include a `.mcp.json` at plugin root:
 }
 ```
 
-Use `${ENV_VAR}` references for runtime values — Claude Code expands these from the process environment. Users set the vars in their shell or under `env` in Claude Code `settings.json`. The `userConfig` fields in `plugin.json` serve as documentation of required config; add `"env": "VAR_NAME"` to link them to the corresponding env var.
+Two ways to inject runtime values:
+
+- **`${user_config.<key>}`** — substituted from the `userConfig` block in `plugin.json` (Claude Code prompts for these on install). This is the preferred mechanism. A `userConfig` field accepts `type`, `title`, `description`, `default`, `sensitive`, `required` — **no `env` key** (the manifest validator rejects unrecognized keys like `"env"`).
+- **`${ENV_VAR}`** — expanded from the process environment; users set the var in their shell or under `env` in Claude Code `settings.json`.
+
+`.cursor-plugin/plugin.json` does **not** carry `userConfig` — Cursor reads its values from env vars instead, so keep the Cursor manifest minimal.
 
 ### SKILL.md frontmatter
 
@@ -92,7 +97,7 @@ All plugins are registered in `.claude-plugin/marketplace.json`. When adding a n
 | `task-memory-agentmemory` | Same contract skills as `task-memory-serena` but backed by **agentmemory MCP**. Drop-in alternative. |
 | `task-memory-silverbullet` | Same contract skills backed by **SilverBullet MCP** (`silverbullet-mcp`). Notes stored as `working-memory/<key>.md`. Requires running [silverbullet-mcp](https://github.com/Ahmad-A0/silverbullet-mcp) server + `userConfig` (Claude Code) or env vars `SILVERBULLET_MCP_URL` / `SILVERBULLET_MCP_TOKEN` (Cursor). Drop-in alternative. |
 | `document-writting` | Document generation skills for the 楽楽販売 PHP project: impact analysis, surveys, detail design, test matrices, document review. Uses Serena MCP to inspect a codebase at `C:\Users\tttuan\PhpstormProjects\hanbai-product`. |
-| `dev-agent-teams` | Multi-agent development pipeline: investigate → design → implement → review → PR. **Config-driven** — the orchestrator reads `pipeline.yaml` (built-in default ← global `.dev-team-agent/pipeline.yaml` ← per-task `tasks/<id>/pipeline.yaml`) to decide steps, per-step agent/skill/rule-category, HITL gates and retry; no config falls back to a built-in 6-agent flow. `/init-dev-pipeline` scaffolds a dummy `pipeline.yaml` (global, or `--task=<id>` override). State + artifacts live under `.dev-team-agent/` (`.dev-state/<id>.json` + `tasks/<id>/`). Includes `/dev-dashboard` — a Vue+Vite dashboard that reads `.dev-team-agent/` (incl. the resolved pipeline config via `/api/pipeline-config`) and visualizes pipeline state in realtime. |
+| `dev-agent-teams` | Multi-agent development pipeline: investigate → design → implement → review → PR. **Config-driven** — the orchestrator reads `pipeline.yaml` (built-in default ← global `.dev-team-agent/pipeline.yaml` ← per-task `tasks/<id>/pipeline.yaml`) to decide steps, per-step agent/skill/rule-category, HITL gates and retry; no config falls back to a built-in 6-agent flow. `/init-dev-pipeline` scaffolds a dummy `pipeline.yaml` (global, or `--task=<id>` override). State + artifacts live under `.dev-team-agent/` (`.dev-state/<id>.json` + `tasks/<id>/`). Includes `/dev-dashboard` — the dashboard **app now lives in a separate repo** ([naut1402/agent-workflow](https://github.com/naut1402/agent-workflow), migrated to TS); the skill bootstraps project state (`setup.mjs`) then clones + runs that app (`$DEV_TEAM_DASHBOARD_APP`, default `~/.dev-team-dashboard/app`, run with **bun**) to read `.dev-team-agent/` and visualize pipeline state in realtime. The orchestrator's runner CLI and the `dev-team-dashboard` MCP server also resolve out of that clone. |
 | `session-retrospective` | Post-task meta skills: `/distill-knowledge` (chắt lọc glossary/flow/domain, gợi ý human lưu memory) và `/analysis-working-pipeline` (phân tích session, sơ đồ suy luận, đề xuất cải tiến). Gọi thủ công — không tích hợp orchestrator. |
 
 ## Architecture: task-memory call chain

@@ -12,33 +12,28 @@
       "type": "string",
       "title": "Dashboard app directory",
       "description": "Absolute path to a local clone of agent-workflow (https://github.com/naut1402/agent-workflow). Used by /dev-dashboard and local runner-cli.",
-      "env": "DEV_TEAM_DASHBOARD_APP",
       "required": true
     },
     "dashboardHome": {
       "type": "string",
       "title": "Dashboard registry home",
-      "description": "Directory for projects.json and runners.json. Default: ~/.dev-team-dashboard",
-      "env": "DEV_TEAM_DASHBOARD_HOME"
+      "description": "Directory for projects.json and runners.json. Default: ~/.dev-team-dashboard"
     },
     "dashboardServerUrl": {
       "type": "string",
       "title": "Remote dashboard URL",
-      "description": "Base URL of deployed dev-team-dashboard (e.g. https://dashboard.example.com). Leave empty for local-only.",
-      "env": "DEV_TEAM_SERVER_URL"
+      "description": "Base URL of deployed dev-team-dashboard (e.g. https://dashboard.example.com). Leave empty for local-only."
     },
     "dashboardApiToken": {
       "type": "string",
       "title": "Remote dashboard API token",
       "description": "Bearer token when remote dashboard requires auth.",
-      "sensitive": true,
-      "env": "DEV_TEAM_API_TOKEN"
+      "sensitive": true
     },
     "dashboardProjectId": {
       "type": "string",
       "title": "Default dashboard project id",
-      "description": "Default project id on remote dashboard for /dev-team-orchestrator --remote.",
-      "env": "DEV_TEAM_PROJECT_ID"
+      "description": "Default project id on remote dashboard for /dev-team-orchestrator --remote."
     }
   }
 }

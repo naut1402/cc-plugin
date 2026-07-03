@@ -12,33 +12,28 @@
       "type": "string",
       "title": "Dashboard app directory",
       "description": "Absolute path to a local clone of the dashboard app repo (https://github.com/naut1402/agent-workflow). The /dev-dashboard skill clones it here, and the dev-team-dashboard MCP server runs from it. Recommended: an absolute path (e.g. /home/you/.dev-team-dashboard/app) — '~' is not expanded when used as the MCP command argument.",
-      "env": "DEV_TEAM_DASHBOARD_APP",
       "required": true
     },
     "dashboardHome": {
       "type": "string",
       "title": "Dashboard registry home",
-      "description": "Directory holding the multi-project registry (projects.json) and runners.json. Leave empty to use the server default (~/.dev-team-dashboard).",
-      "env": "DEV_TEAM_DASHBOARD_HOME"
+      "description": "Directory holding the multi-project registry (projects.json) and runners.json. Leave empty to use the server default (~/.dev-team-dashboard)."
     },
     "dashboardServerUrl": {
       "type": "string",
       "title": "Remote dashboard URL",
-      "description": "Base URL of a deployed dev-team-dashboard server (e.g. https://dashboard.example.com). Used by dev-team-orchestrator for workspace sync and remote job submit (F0003). Leave empty for local-only.",
-      "env": "DEV_TEAM_SERVER_URL"
+      "description": "Base URL of a deployed dev-team-dashboard server (e.g. https://dashboard.example.com). Used by dev-team-orchestrator for workspace sync and remote job submit (F0003). Leave empty for local-only."
     },
     "dashboardApiToken": {
       "type": "string",
       "title": "Remote dashboard API token",
-      "description": "Bearer token when the remote dashboard has DEV_TEAM_API_TOKEN enabled. Set once here — orchestrator and sync scripts read it from env.",
-      "sensitive": true,
-      "env": "DEV_TEAM_API_TOKEN"
+      "description": "Bearer token when the remote dashboard has DEV_TEAM_API_TOKEN enabled. Orchestrator passes this to sync/runner scripts via --api-token or DEV_TEAM_API_TOKEN.",
+      "sensitive": true
     },
     "dashboardProjectId": {
       "type": "string",
       "title": "Default dashboard project id",
-      "description": "Project id on the remote dashboard registry (should match the git repo onboarded on the server). Used as default for /dev-team-orchestrator --remote.",
-      "env": "DEV_TEAM_PROJECT_ID"
+      "description": "Project id on the remote dashboard registry (should match the git repo onboarded on the server). Used as default for /dev-team-orchestrator --remote."
     }
   }
 }

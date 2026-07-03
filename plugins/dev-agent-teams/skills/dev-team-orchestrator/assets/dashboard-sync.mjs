@@ -104,7 +104,7 @@ async function main() {
     const status = runGit(['status', '--porcelain', '--', devTeamRel], gitRoot)
 
     if (status) {
-      runGit(['commit', '-m', message], gitRoot)
+      runGit(['commit', '-m', message, '--', devTeamRel], gitRoot)
       const commit = runGit(['rev-parse', 'HEAD'], gitRoot)
       const branch = runGit(['rev-parse', '--abbrev-ref', 'HEAD'], gitRoot)
       runGit(['push', 'origin', branch], gitRoot)

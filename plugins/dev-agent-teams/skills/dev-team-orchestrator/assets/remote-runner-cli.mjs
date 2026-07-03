@@ -53,7 +53,6 @@ function authHeaders(token) {
 
 async function apiFetch(baseUrl, pathname, { method = 'GET', body, token, projectId } = {}) {
   const base = baseUrl.replace(/\/$/, '')
-  const sep = pathname.includes('?') ? '&' : '?'
   const qs = projectId ? `${pathname.includes('?') ? '&' : '?'}project=${encodeURIComponent(projectId)}` : ''
   const url = `${base}${pathname}${qs}`
   const headers = { ...authHeaders(token) }
@@ -64,6 +63,23 @@ async function apiFetch(baseUrl, pathname, { method = 'GET', body, token, projec
     throw new Error(data.error || `${method} ${pathname} → ${res.status}`)
   }
   return data
+}
+
+function requireJob(job, context) {
+  if (!job || !job.id) {
+    throw new Error(`unexpected response from ${context}: missing job.id`)
+  }
+  return job
+}
+
+function buildForwardArgs(args, excludeKeys = []) {
+  const forward = ['submit']
+  for (const [k, v] of Object.entries(args)) {
+    if (k === '_' || v === true || excludeKeys.includes(k)) continue
+    forward.push(`--${k}`, String(v))
+  }
+  if (args.wait) forward.push('--wait')
+  return forward
 }
 
 function sleep(ms) {
@@ -113,12 +129,15 @@ async function submitRemote(args) {
     },
   }
 
-  const { job } = await apiFetch(server, '/api/jobs', {
-    method: 'POST',
-    body: payload,
-    token: args['api-token'],
-    projectId,
-  })
+  const job = requireJob(
+    (await apiFetch(server, '/api/jobs', {
+      method: 'POST',
+      body: payload,
+      token: args['api-token'],
+      projectId,
+    })).job,
+    'POST /api/jobs',
+  )
 
   if (!args.wait) {
     console.log(JSON.stringify(job, null, 2))
@@ -127,10 +146,13 @@ async function submitRemote(args) {
 
   const deadline = Date.now() + (Number(args['max-wait-ms']) || 3_600_000)
   while (Date.now() < deadline) {
-    const { job: current } = await apiFetch(server, `/api/jobs/${encodeURIComponent(job.id)}`, {
-      token: args['api-token'],
-      projectId,
-    })
+    const current = requireJob(
+      (await apiFetch(server, `/api/jobs/${encodeURIComponent(job.id)}`, {
+        token: args['api-token'],
+        projectId,
+      })).job,
+      `GET /api/jobs/${job.id}`,
+    )
     if (current.status === 'succeeded' || current.status === 'failed' || current.status === 'cancelled') {
       console.log(JSON.stringify(current, null, 2))
       process.exit(current.status === 'succeeded' ? 0 : 1)
@@ -147,13 +169,16 @@ async function main() {
   if (cmd === 'status') {
     const server = (args.server || process.env.DEV_TEAM_SERVER_URL || '').trim()
     const projectId = args.project || process.env.DEV_TEAM_PROJECT_ID?.trim()
-    if (!server) {
+    if (!server || !projectId) {
       localRunnerCli(['status', '--job', args.job])
     }
-    const { job } = await apiFetch(server, `/api/jobs/${encodeURIComponent(args.job)}`, {
-      token: args['api-token'],
-      projectId,
-    })
+    const job = requireJob(
+      (await apiFetch(server, `/api/jobs/${encodeURIComponent(args.job)}`, {
+        token: args['api-token'],
+        projectId,
+      })).job,
+      `GET /api/jobs/${args.job}`,
+    )
     console.log(JSON.stringify(job, null, 2))
     process.exit(job.status === 'succeeded' ? 0 : 1)
   }
@@ -169,13 +194,7 @@ async function main() {
   }
 
   if (args.local) {
-    const forward = ['submit']
-    for (const [k, v] of Object.entries(args)) {
-      if (k === '_' || v === true) continue
-      forward.push(`--${k}`, String(v))
-    }
-    if (args.wait) forward.push('--wait')
-    localRunnerCli(forward)
+    localRunnerCli(buildForwardArgs(args, ['local', 'server', 'project']))
   }
 
   try {
@@ -186,13 +205,7 @@ async function main() {
       process.exit(1)
     }
     console.warn(`[remote-runner] ${err.message || err} — falling back to local runner-cli`)
-    const forward = ['submit']
-    for (const [k, v] of Object.entries(args)) {
-      if (k === '_' || k === 'server' || k === 'project' || k === 'local' || v === true) continue
-      forward.push(`--${k}`, String(v))
-    }
-    if (args.wait) forward.push('--wait')
-    localRunnerCli(forward)
+    localRunnerCli(buildForwardArgs(args, ['server', 'project', 'local']))
   }
 }
 

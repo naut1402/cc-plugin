@@ -252,10 +252,10 @@ Với mỗi step:
 2. **Thực thi agent qua Runner** (ưu tiên) hoặc Task tool (fallback):
    - Ghi prompt theo template (mục Agent prompt template) vào `.dev-team-agent/tasks/<task-id>/.prompt-<step-id>.txt`.
    - Nạp remote config (flags → `orchestrator-remote.json` → env). Xác định `runnerMode`:
-     - **`local`** (Luồng B): submit qua `remote-runner-cli.mjs --local` (wrap local `runner-cli.mjs`).
+     - **`local`** (Luồng B, default): submit qua `remote-runner-cli.mjs --local` — wrap `bun $DEV_TEAM_DASHBOARD_APP/server/runner-cli.mjs`. App dashboard clone tại `$DEV_TEAM_DASHBOARD_APP` (mặc định `~/.dev-team-dashboard/app`, repo [agent-workflow](https://github.com/naut1402/agent-workflow)); chạy `/dev-dashboard` một lần nếu chưa có.
      - **`remote`** (Luồng A/C): submit qua `remote-runner-cli.mjs --server ... --project ...`.
    - Lệnh mẫu — xem section **Remote dashboard** cho đầy đủ flags.
-   - Local runner (`--local`): wrap `bun $DEV_TEAM_DASHBOARD_APP/server/runner-cli.mjs`; đọc default runner từ `~/.dev-team-dashboard/runners.json`, enqueue job, gọi `RunnerProvider` (`claude-code-cli`).
+   - Local runner đọc default runner từ `~/.dev-team-dashboard/runners.json`, enqueue job, gọi `RunnerProvider` (`claude-code-cli`).
    - Remote runner submit `POST /api/jobs?project=<id>`; server enqueue qua provider tương ứng (`claude-code-cli`, `claude-code-ssh`).
    - Nếu job `failed` và lỗi là runner disabled / CLI không tìm thấy / API unreachable → **fallback** spawn `step.agent` qua Task tool với cùng prompt (trừ khi `--no-fallback`).
    - Prompt phải chứa: task id, parent id nếu có, `step.skills`, `rule_category`, `rule_required`, fallback rule, artifact `step.produces`, **`knowledge_inputs`** (nếu có), `export_json`, artifact context hiện có.

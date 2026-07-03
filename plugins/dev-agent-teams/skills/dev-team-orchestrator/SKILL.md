@@ -23,7 +23,7 @@ Nhận `$ARGUMENTS` theo dạng:
 - `--subtask-of=<parent-id>`: tạo workspace subtask, kế thừa artifact nền từ parent khi còn thiếu.
 - `--auto-review`: tự chạy doc-reviewer ở các gate `optional_doc_review` không blocking.
 - `--export-json`: sau mỗi phase, merge structured summary vào `pipeline-export.json`.
-- `--remote`: bật chế độ remote dashboard (đọc config từ `.dev-team-agent/orchestrator-remote.json` hoặc env).
+- `--remote`: bật chế độ remote dashboard (đọc config từ plugin userConfig, `.dev-team-agent/orchestrator-remote.json`, hoặc env).
 - `--project=<id>`: project id trên remote dashboard (override config/env).
 - `--server=<url>`: base URL remote dashboard, ví dụ `https://dashboard.example.com` (override `DEV_TEAM_SERVER_URL`).
 - `--runner=<id>`: runner preset trên server (`claude-code-server`, `claude-code-ssh`, …).
@@ -70,9 +70,31 @@ Orchestrator tích hợp với **remote dev-team-dashboard** deploy trên server
 
 ### Cấu hình remote
 
-Ưu tiên (cao → thấp): CLI flags → `.dev-team-agent/orchestrator-remote.json` → biến môi trường.
+Ưu tiên (cao → thấp): CLI flags → `.dev-team-agent/orchestrator-remote.json` → **plugin userConfig** → biến môi trường.
 
-**File config** (copy từ `assets/orchestrator-remote.example.json`):
+**Plugin userConfig (thiết lập 1 lần — khuyến nghị)**
+
+Khi enable plugin `dev-agent-teams`, điền trong UI plugin settings (Claude Code / Cursor):
+
+| userConfig key | Env var | Mô tả |
+| --- | --- | --- |
+| `dashboardServerUrl` | `DEV_TEAM_SERVER_URL` | URL remote dashboard |
+| `dashboardApiToken` | `DEV_TEAM_API_TOKEN` | API token (masked) |
+| `dashboardProjectId` | `DEV_TEAM_PROJECT_ID` | Project id mặc định trên server |
+| `dashboardApp` | `DEV_TEAM_DASHBOARD_APP` | Path clone agent-workflow (local runner) |
+| `dashboardHome` | `DEV_TEAM_DASHBOARD_HOME` | Registry local (~/.dev-team-dashboard) |
+
+Giá trị userConfig được inject vào process env khi plugin chạy — orchestrator và script `dashboard-sync.mjs` / `remote-runner-cli.mjs` đọc trực tiếp từ env, **không cần** copy vào từng repo.
+
+Sau khi cấu hình xong, chỉ cần:
+
+```text
+/dev-team-orchestrator <task-id> --remote
+```
+
+Không bắt buộc truyền lại `--server` / `--project` nếu userConfig đã có.
+
+**File config per-repo** (copy từ `assets/orchestrator-remote.example.json`, override userConfig khi cần khác project):
 
 ```json
 {
@@ -86,7 +108,7 @@ Orchestrator tích hợp với **remote dev-team-dashboard** deploy trên server
 }
 ```
 
-**Biến môi trường:**
+**Biến môi trường** (tự set khi điền plugin userConfig, hoặc export tay):
 
 | Biến | Mô tả |
 | --- | --- |

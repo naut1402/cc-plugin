@@ -4,7 +4,11 @@
       "command": "bun",
       "args": ["${user_config.dashboardApp}/mcp/server.ts"],
       "env": {
-        "DEV_TEAM_DASHBOARD_HOME": "${user_config.dashboardHome}"
+        "DEV_TEAM_DASHBOARD_HOME": "${user_config.dashboardHome}",
+        "DEV_TEAM_DASHBOARD_APP": "${user_config.dashboardApp}",
+        "DEV_TEAM_SERVER_URL": "${user_config.dashboardServerUrl}",
+        "DEV_TEAM_API_TOKEN": "${user_config.dashboardApiToken}",
+        "DEV_TEAM_PROJECT_ID": "${user_config.dashboardProjectId}"
       }
     }
   }

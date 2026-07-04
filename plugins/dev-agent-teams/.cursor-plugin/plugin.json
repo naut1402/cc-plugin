@@ -22,7 +22,7 @@
     "dashboardServerUrl": {
       "type": "string",
       "title": "Remote dashboard URL",
-      "description": "Base URL of deployed dev-team-dashboard (e.g. https://dashboard.example.com). Leave empty for local-only."
+      "description": "Base URL of deployed dev-team-dashboard (e.g. https://dashboard.example.com). Required for --remote; handshake resolves projectId when omitted. Leave empty for local-only."
     },
     "dashboardApiToken": {
       "type": "string",
@@ -33,7 +33,12 @@
     "dashboardProjectId": {
       "type": "string",
       "title": "Default dashboard project id",
-      "description": "Default project id on remote dashboard for /dev-team-orchestrator --remote."
+      "description": "Optional opaque project id. Prefer empty — resolve-remote.mjs resolves from name or git remote."
+    },
+    "dashboardProjectName": {
+      "type": "string",
+      "title": "Default dashboard project name",
+      "description": "Optional UI display name of the remote project when id is unknown."
     }
   }
 }

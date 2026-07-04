@@ -8,7 +8,8 @@
         "DEV_TEAM_DASHBOARD_APP": "${user_config.dashboardApp}",
         "DEV_TEAM_SERVER_URL": "${user_config.dashboardServerUrl}",
         "DEV_TEAM_API_TOKEN": "${user_config.dashboardApiToken}",
-        "DEV_TEAM_PROJECT_ID": "${user_config.dashboardProjectId}"
+        "DEV_TEAM_PROJECT_ID": "${user_config.dashboardProjectId}",
+        "DEV_TEAM_PROJECT_NAME": "${user_config.dashboardProjectName}"
       }
     }
   }

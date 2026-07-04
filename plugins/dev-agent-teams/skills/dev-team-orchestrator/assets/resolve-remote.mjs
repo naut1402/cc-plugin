@@ -287,15 +287,11 @@ async function resolveProject({ serverUrl, projectId, projectName, token, devTea
     }
   }
 
-  const { projects, defaultId } = await listProjects(serverUrl, token)
+  // Only auto-pick when the server has exactly one project.
+  // Do not use defaultId when multiple projects exist (default may be unrelated).
+  const { projects } = await listProjects(serverUrl, token)
   if (projects.length === 1) {
     return { project: projects[0], resolvedBy: 'single' }
-  }
-  if (defaultId) {
-    const def = projects.find((p) => p.id === defaultId)
-    if (def && projects.length === 1) {
-      return { project: def, resolvedBy: 'default' }
-    }
   }
 
   const err = new Error(

@@ -86,16 +86,18 @@ async function main() {
   const args = parseArgs(process.argv.slice(2))
   const devTeamRoot = path.resolve(args['dev-team-root'] || '.dev-team-agent')
   const remoteCfg = loadRemoteConfig(devTeamRoot)
+  // Precedence matches resolve-remote.mjs: CLI → cache → env
+  // (env must not override a successful handshake cache).
   const projectId = (
     args.project ||
-    process.env.DEV_TEAM_PROJECT_ID ||
     remoteCfg.projectId ||
+    process.env.DEV_TEAM_PROJECT_ID ||
     ''
   ).trim()
   const serverUrl = (
     args.server ||
-    process.env.DEV_TEAM_SERVER_URL ||
     remoteCfg.serverUrl ||
+    process.env.DEV_TEAM_SERVER_URL ||
     ''
   ).trim()
   const message = args.message || remoteCfg.syncMessage || DEFAULT_MESSAGE

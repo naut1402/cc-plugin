@@ -73,20 +73,44 @@ async function triggerServerSync({ serverBaseUrl, projectId, token }) {
   return res.json().catch(() => ({}))
 }
 
+function loadRemoteConfig(devTeamRoot) {
+  const file = path.join(devTeamRoot, 'orchestrator-remote.json')
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   const devTeamRoot = path.resolve(args['dev-team-root'] || '.dev-team-agent')
-  const projectId = args.project || process.env.DEV_TEAM_PROJECT_ID?.trim()
-  const serverUrl = (args.server || process.env.DEV_TEAM_SERVER_URL || '').trim()
-  const message = args.message || DEFAULT_MESSAGE
+  const remoteCfg = loadRemoteConfig(devTeamRoot)
+  const projectId = (
+    args.project ||
+    process.env.DEV_TEAM_PROJECT_ID ||
+    remoteCfg.projectId ||
+    ''
+  ).trim()
+  const serverUrl = (
+    args.server ||
+    process.env.DEV_TEAM_SERVER_URL ||
+    remoteCfg.serverUrl ||
+    ''
+  ).trim()
+  const message = args.message || remoteCfg.syncMessage || DEFAULT_MESSAGE
   const skipPush = args['no-push'] === true
 
   if (!projectId) {
-    console.error('missing --project=<id> or DEV_TEAM_PROJECT_ID')
+    console.error(
+      'missing projectId — run resolve-remote.mjs first, or pass --project=<id> / DEV_TEAM_PROJECT_ID',
+    )
     process.exit(1)
   }
   if (!serverUrl) {
-    console.error('missing --server=<url> or DEV_TEAM_SERVER_URL')
+    console.error(
+      'missing serverUrl — run resolve-remote.mjs first, or pass --server=<url> / DEV_TEAM_SERVER_URL',
+    )
     process.exit(1)
   }
 
@@ -119,7 +143,7 @@ async function main() {
   const sync = await triggerServerSync({
     serverBaseUrl: serverUrl,
     projectId,
-    token: args['api-token'],
+    token: args['api-token'] || remoteCfg.apiToken,
   })
   console.log(`${projectId}: server sync OK`, sync.syncedAt ? `@ ${sync.syncedAt}` : '')
   console.log(JSON.stringify({ ok: true, ...pushResult, synced: true }, null, 2))

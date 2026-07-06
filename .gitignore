@@ -2,4 +2,6 @@
 .vscode/
 .env
 .claude/
-.dev-team-agent/orchestrator-remote.json
+
+# dev-agent-teams dashboard + state
+.dev-team-agent/

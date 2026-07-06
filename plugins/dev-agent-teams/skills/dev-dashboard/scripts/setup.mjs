@@ -1,33 +1,35 @@
 #!/usr/bin/env node
-// Scaffold the dev-team dashboard into a project.
+// Bootstrap a project's dev-team state directory.
 //
 //   node setup.mjs [projectRoot]
+//
+// The dashboard APP itself lives in a separate repo
+// (https://github.com/naut1402/agent-workflow) — this script no longer copies a
+// bundled viewer. It only prepares the project-side `.dev-team-agent/` state that
+// the orchestrator writes and the dashboard reads.
 //
 // Steps (all idempotent):
 //   1. Ensure <projectRoot>/.dev-team-agent/ exists.
 //   2. Migrate legacy top-level `tasks/` and `.dev-state/` into it (if present
 //      at the project root and not already migrated).
-//   3. Copy the bundled Vue+Vite viewer into `.dev-team-agent/viewer/`
-//      (preserving an existing node_modules so re-runs don't trigger reinstall).
+//   3. Scaffold a default `pipeline.yaml` from the canonical asset.
 //   4. Add `.dev-team-agent/` to the project's .gitignore.
-//
-// It does NOT run npm — the SKILL drives install + dev so the user sees output.
+//   5. Inject rule-reference placeholders into CLAUDE.md.
 
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const viewerSrc = path.resolve(__dirname, '../assets/viewer')
 const projectRoot = path.resolve(process.argv[2] || process.cwd())
 const dta = path.join(projectRoot, '.dev-team-agent')
-const viewerDst = path.join(dta, 'viewer')
 
 function log(msg) {
   console.log(`[dev-dashboard] ${msg}`)
 }
 
 fs.mkdirSync(dta, { recursive: true })
+fs.mkdirSync(path.join(dta, 'pipeline-profiles'), { recursive: true })
 
 // 2. Migrate legacy layout.
 for (const dir of ['tasks', '.dev-state']) {
@@ -54,13 +56,6 @@ if (fs.existsSync(pipelinePath)) {
   fs.writeFileSync(pipelinePath, DEFAULT_PIPELINE_YAML)
   log('scaffolded default pipeline.yaml → .dev-team-agent/pipeline.yaml')
 }
-
-// 3. Copy viewer, never clobbering an installed node_modules.
-fs.cpSync(viewerSrc, viewerDst, {
-  recursive: true,
-  filter: (src) => !src.split(path.sep).includes('node_modules'),
-})
-log(`viewer copied → ${path.relative(projectRoot, viewerDst)}/`)
 
 // 4. .gitignore
 const giPath = path.join(projectRoot, '.gitignore')
@@ -104,6 +99,10 @@ Chưa thiết lập
 <!-- Framework (PHPUnit/Jest/…), cấu trúc (AAA), coverage targets, naming convention -->
 Chưa thiết lập
 
+### Rule git/PR
+<!-- Quy ước branch, commit, PR — ví dụ AGENTS.md §6–§7 -->
+Chưa thiết lập
+
 ### File cấu trúc dự án
 <!-- Đường dẫn file mô tả kiến trúc project, e.g. docs/STRUCTURE.md hoặc src/README.md -->
 Chưa thiết lập
@@ -125,4 +124,18 @@ if (claudeMd.includes(RULES_MARKER)) {
   log('added rule placeholders → CLAUDE.md')
 }
 
-log('done. Next: cd .dev-team-agent/viewer && npm install && npm run dev')
+log('done. State ready — the dashboard app is fetched separately.')
+log('')
+log('Next: clone + run the dashboard app (repo: naut1402/agent-workflow).')
+log('  APP_DIR="${DEV_TEAM_DASHBOARD_APP:-~/.dev-team-dashboard/app}"')
+log('  git clone https://github.com/naut1402/agent-workflow "$APP_DIR"   # first time')
+log('')
+log('Single-project run (this project):')
+log(`  cd "$APP_DIR" && bun install && DEV_TEAM_ROOT="${dta}" bun run dev`)
+log('')
+log('Multi-project (standalone) run — one neutral server pointing at N projects:')
+log('  cd "$APP_DIR" && bun install && bun run serve')
+log('  → opens http://127.0.0.1:5174; add each project via the UI sidebar or the')
+log('    MCP `add_project` tool (point it at any `.dev-team-agent/` dir or project root).')
+log('  Registry lives at ~/.dev-team-dashboard/projects.json (override: DEV_TEAM_DASHBOARD_HOME).')
+log('  DEV_TEAM_ROOT, if set, is auto-seeded as the default project.')

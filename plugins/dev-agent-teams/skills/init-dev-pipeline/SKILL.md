@@ -7,7 +7,7 @@ user-invocable: true
 
 # Init Dev Pipeline Config
 
-Sinh file `pipeline.yaml` mẫu để tuỳ biến pipeline của `dev-team-orchestrator`. Template **không nhúng trong skill này** — copy từ asset canonical (nguồn duy nhất, dùng chung với orchestrator + dev-dashboard):
+Sinh file `pipeline.yaml` mẫu để tuỳ biến pipeline của `dev-team-orchestrator`. Template **không nhúng trong skill này** — copy từ asset canonical (nguồn duy nhất, dùng chung với orchestrator + bootstrap của `dev-dashboard`):
 
 - **Global**: `../dev-team-orchestrator/assets/pipeline.default.yaml` — flow 6-agent chuẩn, kèm comment.
 - **Per-task override**: `../dev-team-orchestrator/assets/pipeline.task-override.example.yaml` — mẫu patch tối giản.

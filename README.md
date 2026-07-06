@@ -2,6 +2,8 @@
 
 Plugin collection for Claude Code and Cursor — task memory management, domain context, and working memory skills.
 
+Quy ước git, PR, commit và làm việc với agent: [`AGENTS.md`](AGENTS.md). Cấu trúc plugin: [`CLAUDE.md`](CLAUDE.md).
+
 ## Plugins
 
 | Plugin | Description |

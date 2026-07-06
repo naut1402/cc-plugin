@@ -22,9 +22,9 @@ Ví dụ:
 
 - `docs/U00043/unify-doc-git-rules`
 - `fix/B4488/null-pointer-order-detail`
-- `feat/F003/export-csv`
+- `feat/F003/export-csv-report`
 
-Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `hotfix`.
+Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`.
 
 `short-description`: 3–5 từ tiếng Anh, kebab-case, mô tả thay đổi chính.
 

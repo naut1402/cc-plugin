@@ -10,14 +10,14 @@ labels: []
 
 ## Scope
 **IN scope:**
--
+- ...
 
 **OUT scope:**
--
+- ...
 
 ## Artifact / Kế hoạch
 <!-- Link investigate.md / design.md hoặc mô tả plan. Feature lớn: liệt kê breakdown sub-task ở đây. -->
--
+- ...
 
 ## Checklist
 - [ ] Đã gán label theo type (feat→enhancement · fix→bug · docs→documentation · chore→chore · refactor→refactor · test→test)

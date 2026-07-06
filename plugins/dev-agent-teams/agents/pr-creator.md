@@ -35,7 +35,7 @@ Subagent cuối pipeline — amend commit `wip: implement <task-id>` thành comm
 Đọc "Rule git/PR" trong `.dev-team-agent/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn ở các bước 2–4; nếu phần git-pr trống thì dùng `create-pr` làm fallback.
 
 Theo convention git/PR (project rule ưu tiên, `create-pr` fallback):
-- `<type>/<task-id>/<short-description>` — ví dụ `docs/U00043/unify-doc-git-rules`, `fix/B4488/null-pointer`
+- `<type>/<task-id>/<short-description>` — ví dụ `docs/U00043/unify-doc-git-rules`, `fix/B4488/null-pointer-order-fix`
 
 `short-description`: 3–5 từ tiếng Anh, kebab-case, mô tả thay đổi chính.
 
@@ -58,7 +58,7 @@ Ví dụ: `git commit --amend -m "[U00043] docs: unify doc and git rules"`
 Theo template trong `create-pr`:
 - **Issue** (đầu body): `Part of #<issue-number>`
 - **Summary**: 1–3 bullets từ design §1
-- **Nội dung thay đổi**: bảng Trước/Sau từ `git diff --stat`
+- **Nội dung thay đổi**: bảng Trước/Sau từ `git diff --name-status` + patch diff (không chỉ `--stat` — cần đủ cho rename/split)
 - **Test plan**: checklist từ test-spec.md (TC-01, TC-02, ...)
 - **Notes for reviewer**: những điểm [should] và [imo] từ review.md đáng chú ý
 

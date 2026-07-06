@@ -17,7 +17,7 @@ Plugin `dev-agent-teams` điều phối pipeline phát triển đa agent; state 
 
 ## 2. Cấu trúc dự án — nhìn nhanh
 
-```
+```text
 cc-plugin/
 ├── plugins/<plugin-name>/       # skill, agent, hook, manifest
 │   ├── .claude-plugin/
@@ -88,7 +88,7 @@ Prefix bắt buộc: `[<TASK>] <type>: <mô tả>` hoặc `<type>: <mô tả>` k
 
 Regex minh hoạ:
 
-```
+```text
 ^(\[[A-Za-z0-9][A-Za-z0-9-]*\] )?(feat|fix|chore|docs|refactor|test)(\([a-z0-9-]+\))?: .+
 ```
 

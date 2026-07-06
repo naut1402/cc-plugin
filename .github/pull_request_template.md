@@ -10,7 +10,7 @@ Liên kết issue tracking ở ĐẦU PR body.
 DÙNG từ khoá KHÔNG auto-close: "Refs #<n>" / "Part of #<n>".
 KHÔNG dùng Closes/Fixes/Resolves trừ khi human xác nhận đóng issue.
 -->
-Part of #
+Part of #<n>
 
 ## Phạm vi
 <!-- Plugin / skill / file chính bị ảnh hưởng -->

@@ -1,12 +1,12 @@
 ---
 name: create-pr
-description: Convention git và PR template cho hanbai-product. Reference skill — dùng nội bộ bởi pr-creator agent.
+description: Convention git và PR template — fallback khi project chưa có Rule git/PR; ưu tiên rule từ AGENTS.md qua project-rules.md.
 user-invocable: false
 ---
 
 # Create PR
 
-Quy ước tạo branch, commit, và PR description cho dự án 楽楽販売.
+Quy ước tạo branch, commit, và PR description. Mirror convention `agent-workflow` §6–§7.
 
 ## Rule từ project (ưu tiên)
 
@@ -15,73 +15,68 @@ Orchestrator đã truyền "Rule git/PR" vào `.dev-team-agent/project-rules.md`
 ## Branch naming
 
 ```
-feat/<task-id>-<short-description>
-fix/<task-id>-<short-description>
-hotfix/<task-id>-<short-description>
+<type>/<task-id>/<short-description>
 ```
 
 Ví dụ:
-- `fix/B4488-null-pointer-order-detail`
-- `feat/F003-export-csv`
+
+- `docs/U00043/unify-doc-git-rules`
+- `fix/B4488/null-pointer-order-detail`
+- `feat/F003/export-csv`
+
+Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `hotfix`.
+
+`short-description`: 3–5 từ tiếng Anh, kebab-case, mô tả thay đổi chính.
 
 ## Commit message format
 
 ```
-<type>(<scope>): <subject>
+[<task-id>] <type>: <subject>
 
 <body — optional>
-
-<footer — task reference>
 ```
 
-- `type`: `feat` / `fix` / `refactor` / `docs` / `test` / `chore`
-- `scope`: tên module hoặc màn hình (ví dụ: `order`, `invoice`, `auth`)
-- `subject`: động từ nguyên mẫu, tiếng Anh, không quá 72 ký tự, không có dấu chấm cuối
-- `footer`: `Refs: #<issue-number>` hoặc `Closes: #<issue-number>`
+- `<type>`: `feat` / `fix` / `refactor` / `docs` / `test` / `chore`
+- `<subject>`: mô tả ngắn, không quá 72 ký tự, không dấu chấm cuối
+- Không footer `Refs:` / `Closes:` trong commit — liên kết issue đặt ở **PR body** (`Part of #n`)
 
 Ví dụ:
-```
-fix(order): prevent null pointer when order has no items
 
-Refs: #B4488
+```
+[U00043] docs: unify doc and git rules with agent-workflow
 ```
 
-**Không thêm AI trailer** vào commit message (không có "Co-Authored-By: Claude").
+**Không thêm AI trailer** vào commit message (không có `Co-Authored-By: …`, không footer công cụ).
 
 ## PR description template (`pr-desc.md`)
 
 ```markdown
+## Issue
+
+Part of #<issue-number>
+
 ## Summary
 
 <1–3 bullet points mô tả thay đổi chính>
 
-## Root cause / Background
+## Nội dung thay đổi
 
-<Mô tả ngắn vấn đề và tại sao cần fix — từ investigate.md>
-
-## Changes
-
-| File | Thay đổi |
-|---|---|
-| path/to/file.php | Mô tả thay đổi |
+| Trước | Sau | Ghi chú |
+|-------|-----|---------|
+| path/to/file | path/to/file | Mô tả |
 
 ## Test plan
 
-- [ ] TC-01: <tên test case>
-- [ ] TC-02: <tên test case>
-- [ ] Regression: <chức năng liên quan cần test thủ công>
+- [ ] TC-01: <tên test case / manual review>
+- [ ] Regression: <chức năng liên quan>
 
 ## Notes for reviewer
 
-<Điểm cần reviewer chú ý đặc biệt — từ review.md>
-
-## Related
-
-- Issue: #<task-id>
-- Design doc: .dev-team-agent/tasks/<task-id>/design.md
+<Điểm cần reviewer chú ý — từ review.md>
 ```
 
 ## Lưu ý
 
 - `pr-creator` agent ghi `pr-desc.md` nhưng **không tự tạo PR** trên GitHub/GitLab.
 - Orchestrator hoặc user sẽ tạo PR thủ công sau khi đọc và confirm `pr-desc.md`.
+- PR title dùng cùng prefix với commit: `[<task-id>] <type>: <mô tả>`.

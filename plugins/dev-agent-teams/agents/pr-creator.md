@@ -35,36 +35,32 @@ Subagent cuối pipeline — amend commit `wip: implement <task-id>` thành comm
 Đọc "Rule git/PR" trong `.dev-team-agent/project-rules.md` do orchestrator truyền vào — rule project ưu tiên hơn ở các bước 2–4; nếu phần git-pr trống thì dùng `create-pr` làm fallback.
 
 Theo convention git/PR (project rule ưu tiên, `create-pr` fallback):
-- `fix/<task-id>-<short-description>` cho bug fix
-- `feat/<task-id>-<short-description>` cho feature
+- `<type>/<task-id>/<short-description>` — ví dụ `docs/U00043/unify-doc-git-rules`, `fix/B4488/null-pointer`
 
 `short-description`: 3–5 từ tiếng Anh, kebab-case, mô tả thay đổi chính.
 
 ### Bước 3: Amend commit message
 
 Theo format trong `create-pr`. Amend commit implement thành message chuẩn:
-- `type`: từ loại task (fix/feat)
-- `scope`: tên module chính từ design
-- `subject`: mô tả ngắn gọn thay đổi
-- `footer`: `Refs: #<task-id>`
+- `[<task-id>] <type>: <subject>`
+- Không footer `Refs:` / `Closes:` — liên kết issue đặt ở PR body
 
 ```
-git commit --amend -m "<type>(<scope>): <subject>
-
-Refs: #<task-id>"
+git commit --amend -m "[<task-id>] <type>: <subject>"
 ```
+
+Ví dụ: `git commit --amend -m "[U00043] docs: unify doc and git rules"`
 
 **Không thêm "Co-Authored-By: Claude" hay AI trailer.**
 
 ### Bước 4: Soạn PR description
 
 Theo template trong `create-pr`:
+- **Issue** (đầu body): `Part of #<issue-number>`
 - **Summary**: 1–3 bullets từ design §1
-- **Root cause**: từ investigate.md hoặc design §2
-- **Changes**: bảng files từ `git diff --stat`
+- **Nội dung thay đổi**: bảng Trước/Sau từ `git diff --stat`
 - **Test plan**: checklist từ test-spec.md (TC-01, TC-02, ...)
 - **Notes for reviewer**: những điểm [should] và [imo] từ review.md đáng chú ý
-- **Related**: link issue và design doc
 
 ### Bước 5: Ghi pr-desc.md
 
@@ -78,8 +74,8 @@ Ghi `.dev-team-agent/tasks/<task-id>/pr-desc.md` với:
 ```
 PR-CREATOR DONE [<task-id>]
 - pr-desc.md: .dev-team-agent/tasks/<task-id>/pr-desc.md
-- Branch: fix/<task-id>-...
-- Commit amended: fix(scope): ...
+- Branch: docs/<task-id>/...
+- Commit amended: [<task-id>] docs: ...
 
 Pipeline hoàn tất. Kiểm tra pr-desc.md, push branch và tạo PR thủ công.
 ```

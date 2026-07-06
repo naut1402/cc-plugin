@@ -99,6 +99,10 @@ Chưa thiết lập
 <!-- Framework (PHPUnit/Jest/…), cấu trúc (AAA), coverage targets, naming convention -->
 Chưa thiết lập
 
+### Rule git/PR
+<!-- Quy ước branch, commit, PR — ví dụ AGENTS.md §6–§7 -->
+Chưa thiết lập
+
 ### File cấu trúc dự án
 <!-- Đường dẫn file mô tả kiến trúc project, e.g. docs/STRUCTURE.md hoặc src/README.md -->
 Chưa thiết lập

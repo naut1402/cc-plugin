@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A plugin collection for Claude Code and Cursor. Plugins are **pure Markdown** — no build step, no tests, no package manager. Each plugin is a directory under `plugins/` with skills defined as `SKILL.md` files.
 
+Quy ước git, PR, commit, và xuất tài liệu: xem [`AGENTS.md`](AGENTS.md).
+
 ## Plugin Structure
 
 ```
@@ -135,23 +137,28 @@ claude plugin add task-memory@tttuan-plugins-official
 > Điền đường dẫn / nội dung cụ thể bên dưới. Mục có ⚠ là **bắt buộc** — pipeline sẽ dừng nếu thiếu.
 
 ### Rule coding
-<!-- Điền đường dẫn hoặc mô tả quy tắc coding của project (naming, style, lint rules) -->
-Chưa thiết lập
+
+- [AGENTS.md](AGENTS.md) — §3 Quy ước code
 
 ### Rule viết tài liệu (doc-writing) ⚠ Bắt buộc
-<!-- Investigator và designer đọc rule này để format investigate.md / design.md.
-     Ví dụ: "xem coding-conventions.md §Doc" hoặc paste nội dung trực tiếp. -->
-Chưa thiết lập
+
+- [.cursor/rules/cc-plugin-doc-writing.mdc](.cursor/rules/cc-plugin-doc-writing.mdc)
 
 ### Rule trình bày (presentation)
-<!-- Quy tắc format tài liệu: heading style, ngôn ngữ (vn/jp), bảng vs list, độ dài mục -->
-Chưa thiết lập
+
+- Phi ngôn ngữ kỹ thuật khi trình bày tài liệu điều tra, thiết kế.
 
 ### Rule viết test case
-<!-- Framework (PHPUnit/Jest/…), cấu trúc (AAA), coverage targets, naming convention -->
-Chưa thiết lập
+
+- [AGENTS.md](AGENTS.md) — §4 Test
+
+### Rule git/PR
+
+- [AGENTS.md](AGENTS.md) — §6 Xuất tài liệu, §7 Git hygiene
 
 ### File cấu trúc dự án
-<!-- Đường dẫn file mô tả kiến trúc project, e.g. docs/STRUCTURE.md hoặc src/README.md -->
-Chưa thiết lập
+
+- [CLAUDE.md](CLAUDE.md) — cấu trúc plugin, marketplace, SKILL.md format.
+- [AGENTS.md](AGENTS.md) — §2 Cấu trúc dự án
+- `plugins/dev-agent-teams/` — orchestrator, agents.
 

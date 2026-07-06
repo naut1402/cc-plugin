@@ -1,0 +1,13 @@
+{
+  "serverUrl": "https://dashboard.example.com",
+  "projectId": "cc-plugin-44ce24d6",
+  "projectName": "cc-plugin",
+  "apiToken": null,
+  "runnerMode": "local",
+  "runnerId": null,
+  "syncAfterState": true,
+  "syncAfterStep": true,
+  "syncMessage": "chore(dev-team): sync orchestrator artifacts",
+  "resolvedAt": "2026-07-06T00:00:00.000Z",
+  "resolvedBy": "manual"
+}

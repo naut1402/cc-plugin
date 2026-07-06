@@ -259,7 +259,35 @@ Khi chạy hết mọi step:
 - Báo hoàn tất và liệt kê artifact chính đã tạo theo `steps[].produces`.
 - Nếu có PR artifact hoặc PR URL từ agent, đặt nó ở cuối phản hồi.
 
+## Sync workspace (Luồng B)
+
+Sau **mỗi lần ghi state** và **sau mỗi step hoàn tất** (khi `syncAfterState` / `syncAfterStep` bật trong `orchestrator-remote.json`):
+
+```bash
+node plugins/dev-agent-teams/skills/dev-team-orchestrator/assets/dashboard-sync.mjs \
+  --dev-team-root .dev-team-agent \
+  --project <project-id> \
+  --server <server-url>
+```
+
+`project` / `server` lấy từ `orchestrator-remote.json` nếu đã chạy `resolve-remote.mjs` (không cần truyền lại).
+
+**Hành vi (`dashboard-sync.mjs`, B0001 / #41):**
+
+- Đọc `orchestrator-remote.json` → `serverUrl`, `projectId`, `apiToken` (cùng precedence với `resolve-remote.mjs`: CLI → cache → `DEV_TEAM_*` env).
+- Duyệt `.dev-team-agent/**` theo whitelist mirror `agent-workflow/shared/schemas/artifact-sync.ts`:
+  - Exact: `pipeline.yaml`, `knowledge.config.yaml`, `project-rules.md`
+  - Prefix: `.dev-state/`, `tasks/`, `knowledge/`
+- `POST /api/projects/:id/artifacts` — body `{ files: [{ relPath, content }] }`, utf8, không base64.
+- Tổng `content` mỗi request ≤ 50MB; vượt thì chia batch tuần tự.
+- **Không** `git add` / `commit` / `push`; **không** gọi `POST /sync`.
+- `orchestrator-remote.json` không nằm whitelist — không upload.
+
+**Yêu cầu server:** project kind `api` với route B0001 đã deploy. Server cũ (chỉ có `POST /sync`) → dùng `dashboard-sync-compat.mjs` (ngoài phạm vi #41).
+
 ## Bundled references
 
 - `assets/pipeline.default.yaml`: default pipeline 6 bước.
 - `assets/pipeline.task-override.example.yaml`: ví dụ patch per-task.
+- `assets/dashboard-sync.mjs`: upload artifact Luồng B qua HTTP API (#41).
+- `assets/dashboard-sync-compat.mjs`: legacy git push + `/sync` (server chưa có `/artifacts`).

@@ -51,7 +51,7 @@ function pickPluginOptions(pluginConfigs) {
 }
 
 function mapOptions(options) {
-  const out = { runnerMode: 'local' }
+  const out = {}
   for (const [from, to] of FIELD_MAP) {
     const v = options[from]
     if (v !== undefined && v !== null && String(v).trim() !== '') {
@@ -66,12 +66,10 @@ function readPluginOptionsFromFile(file) {
   if (!data) return null
   const fromPluginConfigs = pickPluginOptions(data.pluginConfigs)
   if (fromPluginConfigs) return { source: file, ...fromPluginConfigs }
-  // Cursor có thể lồng khác — quét nông
-  if (data['dev-agent-teams@tttuan-plugins-official']?.options) {
-    return {
-      source: file,
-      key: 'dev-agent-teams@tttuan-plugins-official',
-      options: data['dev-agent-teams@tttuan-plugins-official'].options,
+  for (const [key, value] of Object.entries(data)) {
+    if (!key.startsWith(PLUGIN_KEY_SUFFIX)) continue
+    if (value?.options && typeof value.options === 'object') {
+      return { source: file, key, options: value.options }
     }
   }
   return null

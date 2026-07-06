@@ -78,9 +78,18 @@ async function main() {
   }
 
   const url = `${serverUrl.replace(/\/$/, '')}/api/projects/${encodeURIComponent(projectId)}/sync`
-  const res = await fetch(url, { method: 'POST', headers: authHeaders(apiToken) })
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: authHeaders(apiToken),
+    signal: AbortSignal.timeout(30_000),
+  })
   const body = await res.text().catch(() => '')
-  const data = body ? JSON.parse(body) : {}
+  let data = {}
+  try {
+    data = body ? JSON.parse(body) : {}
+  } catch {
+    data = { raw: body }
+  }
   if (!res.ok) {
     throw new Error(`server sync failed: HTTP ${res.status} ${data.error || body}`.slice(0, 500))
   }

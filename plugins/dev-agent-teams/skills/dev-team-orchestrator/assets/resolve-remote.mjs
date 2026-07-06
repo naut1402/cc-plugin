@@ -13,7 +13,6 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import {
   formatMissingRemoteHint,
-  loadConfigLayers,
   mergeRemoteConfig,
   parseCliArgs,
 } from './remote-config.mjs'
@@ -95,7 +94,10 @@ function projectSummary(p) {
 
 async function apiGet(serverUrl, pathname, token) {
   const base = serverUrl.replace(/\/$/, '')
-  const res = await fetch(`${base}${pathname}`, { headers: authHeaders(token) })
+  const res = await fetch(`${base}${pathname}`, {
+    headers: authHeaders(token),
+    signal: AbortSignal.timeout(10_000),
+  })
   const data = await res.json().catch(() => ({}))
   return { status: res.status, ok: res.ok, data }
 }
@@ -219,7 +221,7 @@ async function main() {
   const devTeamRoot = path.resolve(args['dev-team-root'] || '.dev-team-agent')
   const noWrite = args['no-write'] === true
   const merged = mergeRemoteConfig({ cli: args, devTeamRoot })
-  const { repoCfg } = loadConfigLayers(devTeamRoot)
+  const repoCfg = merged.repoCfg || {}
 
   if (!merged.serverUrl) {
     console.error(formatMissingRemoteHint(merged))
@@ -273,7 +275,8 @@ async function main() {
     console.error(`wrote ${configPath}`)
   }
 
-  console.log(JSON.stringify(out, null, 2))
+  const printable = { ...out, apiToken: out.apiToken ? '[redacted]' : null }
+  console.log(JSON.stringify(printable, null, 2))
 }
 
 main().catch((err) => {

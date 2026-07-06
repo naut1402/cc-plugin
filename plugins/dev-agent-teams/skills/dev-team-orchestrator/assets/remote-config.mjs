@@ -67,12 +67,18 @@ export function loadConfigLayers(devTeamRoot) {
   }
 }
 
-function firstNonEmpty(...values) {
+function firstNonEmptyString(...values) {
   for (const v of values) {
-    const s = typeof v === 'string' ? v.trim() : v
-    if (s !== undefined && s !== null && s !== '') return typeof s === 'string' ? s.trim() : s
+    if (typeof v !== 'string') continue
+    const s = v.trim()
+    if (s) return s
   }
   return ''
+}
+
+function cliString(cli, key) {
+  const v = cli[key]
+  return typeof v === 'string' ? v.trim() : ''
 }
 
 /**
@@ -80,35 +86,37 @@ function firstNonEmpty(...values) {
  */
 export function mergeRemoteConfig(opts = {}) {
   const cli = opts.cli || {}
-  const { globalCfg, repoCfg } = loadConfigLayers(opts.devTeamRoot)
+  const layers = loadConfigLayers(opts.devTeamRoot)
+  const { globalCfg, repoCfg, devTeamRoot, globalPath } = layers
 
-  const serverUrl = firstNonEmpty(
-    cli.server,
+  const serverUrl = firstNonEmptyString(
+    cliString(cli, 'server'),
     repoCfg.serverUrl,
     globalCfg.serverUrl,
     process.env.DEV_TEAM_SERVER_URL,
   )
-  const projectId = firstNonEmpty(
-    cli.project,
+  const projectId = firstNonEmptyString(
+    cliString(cli, 'project'),
     repoCfg.projectId,
     globalCfg.projectId,
     process.env.DEV_TEAM_PROJECT_ID,
   )
-  const projectName = firstNonEmpty(
-    cli['project-name'],
+  const projectName = firstNonEmptyString(
+    cliString(cli, 'project-name'),
     repoCfg.projectName,
     globalCfg.projectName,
     process.env.DEV_TEAM_PROJECT_NAME,
   )
   const apiToken =
-    cli['api-token'] ??
-    repoCfg.apiToken ??
-    globalCfg.apiToken ??
-    process.env.DEV_TEAM_API_TOKEN?.trim() ??
+    cliString(cli, 'api-token') ||
+    repoCfg.apiToken ||
+    globalCfg.apiToken ||
+    process.env.DEV_TEAM_API_TOKEN?.trim() ||
     null
 
-  const runnerMode = cli['runner-mode'] || repoCfg.runnerMode || globalCfg.runnerMode || 'local'
-  const runnerId = cli.runner || repoCfg.runnerId || globalCfg.runnerId || null
+  const runnerMode =
+    cliString(cli, 'runner-mode') || repoCfg.runnerMode || globalCfg.runnerMode || 'local'
+  const runnerId = cliString(cli, 'runner') || repoCfg.runnerId || globalCfg.runnerId || null
 
   return {
     serverUrl,
@@ -124,11 +132,12 @@ export function mergeRemoteConfig(opts = {}) {
       globalCfg.syncMessage ||
       'chore(dev-team): sync orchestrator artifacts',
     configSources: {
-      global: globalRemoteConfigPath(),
+      global: globalPath,
       globalLoaded: Boolean(globalCfg.serverUrl),
-      repo: path.join(loadConfigLayers(opts.devTeamRoot).devTeamRoot, 'orchestrator-remote.json'),
+      repo: path.join(devTeamRoot, 'orchestrator-remote.json'),
       repoLoaded: Boolean(repoCfg.serverUrl || repoCfg.projectId),
     },
+    repoCfg,
   }
 }
 

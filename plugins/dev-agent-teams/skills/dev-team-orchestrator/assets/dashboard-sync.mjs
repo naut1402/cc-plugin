@@ -10,6 +10,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { formatMissingRemoteHint, mergeRemoteConfig, parseCliArgs } from './remote-config.mjs'
 
 // agent-workflow/shared/schemas/artifact-sync.ts
 const ARTIFACT_SYNC_ALLOWED_EXACT_FILES = [
@@ -20,57 +21,7 @@ const ARTIFACT_SYNC_ALLOWED_EXACT_FILES = [
 const ARTIFACT_SYNC_ALLOWED_PREFIXES = ['.dev-state/', 'tasks/', 'knowledge/']
 const ARTIFACT_SYNC_MAX_TOTAL_BYTES = 50_000_000
 const ARTIFACT_MAX_FILE_BYTES = 5_000_000
-
-function parseArgs(argv) {
-  const out = {}
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i]
-    if (!a.startsWith('--')) continue
-    const body = a.slice(2)
-    const eq = body.indexOf('=')
-    if (eq !== -1) {
-      const key = body.slice(0, eq)
-      const val = body.slice(eq + 1)
-      out[key] = val === '' ? true : val
-      continue
-    }
-    const next = argv[i + 1]
-    if (next && !next.startsWith('--')) {
-      out[body] = next
-      i++
-    } else {
-      out[body] = true
-    }
-  }
-  return out
-}
-
-function loadRemoteConfig(devTeamRoot) {
-  const file = path.join(devTeamRoot, 'orchestrator-remote.json')
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'))
-  } catch {
-    return {}
-  }
-}
-
-function resolveConnection(args, devTeamRoot) {
-  const remoteCfg = loadRemoteConfig(devTeamRoot)
-  const projectId = (
-    args.project ||
-    remoteCfg.projectId ||
-    process.env.DEV_TEAM_PROJECT_ID ||
-    ''
-  ).trim()
-  const serverUrl = (
-    args.server ||
-    remoteCfg.serverUrl ||
-    process.env.DEV_TEAM_SERVER_URL ||
-    ''
-  ).trim()
-  const apiToken = args['api-token'] || remoteCfg.apiToken || process.env.DEV_TEAM_API_TOKEN?.trim() || null
-  return { projectId, serverUrl, apiToken }
-}
+const FETCH_TIMEOUT_MS = 30_000
 
 function isArtifactPathAllowed(relPath) {
   if (ARTIFACT_SYNC_ALLOWED_EXACT_FILES.includes(relPath)) return true
@@ -110,12 +61,13 @@ function readArtifactFiles(entries) {
     } catch (err) {
       throw new Error(`cannot read ${relPath}: ${err.message || err}`)
     }
-    if (content.length > ARTIFACT_MAX_FILE_BYTES) {
+    const byteLength = Buffer.byteLength(content, 'utf8')
+    if (byteLength > ARTIFACT_MAX_FILE_BYTES) {
       throw new Error(
-        `file ${relPath} is ${content.length} bytes — exceeds per-file limit of ${ARTIFACT_MAX_FILE_BYTES}`,
+        `file ${relPath} is ${byteLength} bytes — exceeds per-file limit of ${ARTIFACT_MAX_FILE_BYTES}`,
       )
     }
-    files.push({ relPath, content })
+    files.push({ relPath, content, byteLength })
   }
   return files
 }
@@ -126,7 +78,7 @@ function batchFilesByTotalBytes(files, maxTotalBytes) {
   let currentSize = 0
 
   for (const file of files) {
-    const size = file.content.length
+    const size = file.byteLength
     if (size > maxTotalBytes) {
       throw new Error(
         `file ${file.relPath} exceeds batch limit of ${maxTotalBytes} bytes — split files or raise server cap`,
@@ -155,7 +107,8 @@ async function uploadArtifacts({ serverBaseUrl, projectId, token, files }) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-    body: JSON.stringify({ files }),
+    body: JSON.stringify({ files: files.map(({ relPath, content }) => ({ relPath, content })) }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   })
   const body = await res.text().catch(() => '')
   let data = {}
@@ -172,27 +125,23 @@ async function uploadArtifacts({ serverBaseUrl, projectId, token, files }) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2))
+  const args = parseCliArgs(process.argv.slice(2))
   const devTeamRoot = path.resolve(args['dev-team-root'] || '.dev-team-agent')
-  const { projectId, serverUrl, apiToken } = resolveConnection(args, devTeamRoot)
+  const remoteCfg = mergeRemoteConfig({ cli: args, devTeamRoot })
+  const projectId = (remoteCfg.projectId || '').trim()
+  const serverUrl = remoteCfg.serverUrl
+  const apiToken = remoteCfg.apiToken
 
-  if (!projectId) {
-    console.error(
-      'missing projectId — run resolve-remote.mjs first, or pass --project=<id> / DEV_TEAM_PROJECT_ID',
-    )
-    process.exit(1)
-  }
-  if (!serverUrl) {
-    console.error(
-      'missing serverUrl — run resolve-remote.mjs first, or pass --server=<url> / DEV_TEAM_SERVER_URL',
-    )
+  if (!projectId || !serverUrl) {
+    console.error(formatMissingRemoteHint(remoteCfg))
+    console.error('hint: run resolve-remote.mjs first to resolve projectId and cache orchestrator-remote.json')
     process.exit(1)
   }
 
   const entries = walkAllowedFiles(devTeamRoot)
   const files = readArtifactFiles(entries)
   const batches = batchFilesByTotalBytes(files, ARTIFACT_SYNC_MAX_TOTAL_BYTES)
-  const totalBytes = files.reduce((sum, f) => sum + f.content.length, 0)
+  const totalBytes = files.reduce((sum, f) => sum + f.byteLength, 0)
 
   if (batches.length > 1) {
     console.error(
@@ -211,7 +160,7 @@ async function main() {
   let lastResult = {}
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i]
-    const batchBytes = batch.reduce((sum, f) => sum + f.content.length, 0)
+    const batchBytes = batch.reduce((sum, f) => sum + f.byteLength, 0)
     console.error(`uploading batch ${i + 1}/${batches.length}: ${batch.length} files, ${batchBytes} bytes`)
     lastResult = await uploadArtifacts({
       serverBaseUrl: serverUrl,

@@ -479,12 +479,42 @@ Khi chạy hết mọi step:
 - Báo hoàn tất và liệt kê artifact chính đã tạo theo `steps[].produces`.
 - Nếu có PR artifact hoặc PR URL từ agent, đặt nó ở cuối phản hồi.
 
+## Sync workspace (Luồng B)
+
+Sau **mỗi lần ghi state** và **sau mỗi step hoàn tất** (khi `syncAfterState` / `syncAfterStep` bật trong `orchestrator-remote.json`):
+
+```bash
+node plugins/dev-agent-teams/skills/dev-team-orchestrator/assets/dashboard-sync.mjs \
+  --dev-team-root .dev-team-agent \
+  --project <project-id> \
+  --server <server-url>
+```
+
+`project` / `server` lấy từ `orchestrator-remote.json` nếu đã chạy `resolve-remote.mjs` (không cần truyền lại).
+
+**Hành vi (`dashboard-sync.mjs`, B0001 / #41):**
+
+- Đọc `orchestrator-remote.json` → `serverUrl`, `projectId`, `apiToken` (cùng precedence với `resolve-remote.mjs`: CLI → cache → `DEV_TEAM_*` env).
+- Duyệt `.dev-team-agent/**` theo whitelist mirror `agent-workflow/shared/schemas/artifact-sync.ts`:
+  - Exact: `pipeline.yaml`, `knowledge.config.yaml`, `project-rules.md`
+  - Prefix: `.dev-state/`, `tasks/`, `knowledge/`
+- `POST /api/projects/:id/artifacts` — body `{ files: [{ relPath, content }] }`, utf8, không base64.
+- Tổng `content` mỗi request ≤ 50MB; vượt thì chia batch tuần tự.
+- **Không** `git add` / `commit` / `push`; **không** gọi `POST /sync`.
+- `orchestrator-remote.json` không nằm whitelist — không upload.
+
+**Yêu cầu server:** project kind `api` với route B0001 đã deploy. Server cũ (chỉ có `POST /sync`) → dùng `dashboard-sync-compat.mjs` (ngoài phạm vi #41).
+
 ## Bundled references
 
 - `assets/pipeline.default.yaml`: default pipeline 6 bước.
 - `assets/pipeline.task-override.example.yaml`: ví dụ patch per-task.
 - `assets/orchestrator-remote.example.json`: mẫu config remote dashboard.
+- `assets/user-remote.example.json`: mẫu `~/.dev-team-dashboard/remote.json` (workaround plugin userConfig).
+- `assets/remote-config.mjs`: merge config CLI → repo → global → env.
+- `assets/materialize-remote-from-plugin.mjs`: đọc plugin UI settings → global remote.json (#45).
 - `assets/resolve-remote.mjs`: handshake — health + resolve projectId + cache `orchestrator-remote.json` (cc-plugin#39).
-- `assets/dashboard-sync.mjs`: push `.dev-team-agent/` lên git + trigger server sync (Luồng B).
+- `assets/dashboard-sync.mjs`: upload artifact Luồng B qua HTTP API (#41).
+- `assets/dashboard-sync-compat.mjs`: legacy git push + `/sync` (server chưa có `/artifacts`).
 - `assets/remote-runner-cli.mjs`: submit job local hoặc remote API (Luồng A/B/C).
 - Remote dashboard repo: [naut1402/agent-workflow](https://github.com/naut1402/agent-workflow) — docs tại `docs/deploy.md`, `docs/ssh-remote.md`, `docs/multi-env.md`. API resolve: agent-workflow#53.

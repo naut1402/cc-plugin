@@ -1,0 +1,8 @@
+{
+  "_comment": "Copy to ~/.dev-team-dashboard/remote.json — workaround khi plugin userConfig UI không vào shell agent. Điền cùng giá trị đã cấu hình trong Cursor plugin settings (dashboardServerUrl, dashboardApiToken, …). Không commit file remote.json thật.",
+  "serverUrl": "https://dashboard.example.com",
+  "apiToken": null,
+  "projectId": null,
+  "projectName": "cc-plugin",
+  "runnerMode": "local"
+}

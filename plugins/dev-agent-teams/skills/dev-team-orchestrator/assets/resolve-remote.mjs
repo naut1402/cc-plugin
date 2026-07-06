@@ -12,36 +12,20 @@
  *     [--server=<url>] [--project=<id>] [--project-name=<name>] \
  *     [--api-token=<token>] [--runner-mode=local|remote] [--no-write]
  *
- * Precedence (high → low): CLI flags → orchestrator-remote.json → env DEV_TEAM_*.
+ * Precedence (high → low): CLI → orchestrator-remote.json → ~/.dev-team-dashboard/remote.json → DEV_TEAM_* env.
  * Exit 0 on success; exit 1 with project list when resolve fails.
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
+import {
+  formatMissingRemoteHint,
+  mergeRemoteConfig,
+  parseCliArgs,
+} from './remote-config.mjs'
 
 function parseArgs(argv) {
-  const out = {}
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i]
-    if (!a.startsWith('--')) continue
-    const key = a.slice(2)
-    const next = argv[i + 1]
-    if (next && !next.startsWith('--')) {
-      out[key] = next
-      i++
-    } else {
-      out[key] = true
-    }
-  }
-  return out
-}
-
-function readJson(file) {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'))
-  } catch {
-    return null
-  }
+  return parseCliArgs(argv)
 }
 
 function authHeaders(token) {
@@ -123,8 +107,10 @@ function projectSummary(p) {
 
 async function apiGet(serverUrl, pathname, token) {
   const base = serverUrl.replace(/\/$/, '')
-  const url = `${base}${pathname}`
-  const res = await fetch(url, { headers: authHeaders(token) })
+  const res = await fetch(`${base}${pathname}`, {
+    headers: authHeaders(token),
+    signal: AbortSignal.timeout(10_000),
+  })
   const data = await res.json().catch(() => ({}))
   return { status: res.status, ok: res.ok, data }
 }
@@ -301,65 +287,25 @@ async function resolveProject({ serverUrl, projectId, projectName, token, devTea
   throw err
 }
 
-function loadExistingConfig(configPath) {
-  const existing = readJson(configPath)
-  return existing && typeof existing === 'object' ? existing : {}
-}
-
-function mergeConfig(args, existing) {
-  const serverUrl = (
-    args.server ||
-    existing.serverUrl ||
-    process.env.DEV_TEAM_SERVER_URL ||
-    ''
-  ).trim()
-  const projectId = (
-    args.project ||
-    existing.projectId ||
-    process.env.DEV_TEAM_PROJECT_ID ||
-    ''
-  ).trim() || null
-  const projectName = (
-    args['project-name'] ||
-    existing.projectName ||
-    process.env.DEV_TEAM_PROJECT_NAME ||
-    ''
-  ).trim() || null
-  const apiToken = args['api-token'] || existing.apiToken || null
-  const runnerMode = args['runner-mode'] || existing.runnerMode || 'local'
-  const runnerId = args.runner || existing.runnerId || null
-
-  return {
-    serverUrl,
-    projectId,
-    projectName,
-    apiToken,
-    runnerMode,
-    runnerId,
-    syncAfterState: existing.syncAfterState !== false,
-    syncAfterStep: existing.syncAfterStep !== false,
-    syncMessage: existing.syncMessage || 'chore(dev-team): sync orchestrator artifacts',
-  }
-}
-
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   const devTeamRoot = path.resolve(args['dev-team-root'] || '.dev-team-agent')
   const configPath = path.join(devTeamRoot, 'orchestrator-remote.json')
-  const existing = loadExistingConfig(configPath)
-  const merged = mergeConfig(args, existing)
   const noWrite = args['no-write'] === true
+  const merged = mergeRemoteConfig({ cli: args, devTeamRoot })
+  const existing = merged.repoCfg || {}
 
   if (!merged.serverUrl) {
-    console.error(
-      'missing serverUrl — pass --server=<url>, set DEV_TEAM_SERVER_URL, or write orchestrator-remote.json',
-    )
+    console.error(formatMissingRemoteHint(merged))
     console.error('When using --remote, serverUrl is required. Do not fall back to local-only.')
     process.exit(1)
   }
 
   const health = await healthCheck(merged.serverUrl, merged.apiToken)
   console.error(`health ok: version=${health.version || '?'} env=${health.env || '?'}`)
+  if (merged.configSources.globalLoaded) {
+    console.error(`using global config: ${merged.configSources.global}`)
+  }
 
   let resolved
   try {
@@ -402,8 +348,8 @@ async function main() {
     console.error(`wrote ${configPath}`)
   }
 
-  // Machine-readable result on stdout (agent can parse / export env)
-  console.log(JSON.stringify(out, null, 2))
+  const printable = { ...out, apiToken: out.apiToken ? '[redacted]' : null }
+  console.log(JSON.stringify(printable, null, 2))
 }
 
 main().catch((err) => {

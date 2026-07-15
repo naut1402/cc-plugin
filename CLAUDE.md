@@ -78,6 +78,7 @@ user-invocable: true   # false = contract skill, only called by other skills
 ---
 ```
 
+Skill body (`SKILL.md`) is written in **English** (see `.cursor/rules/cc-plugin-skill-authoring.mdc`, glob-scoped to skill files). Runtime artifacts (issue/PR text) still follow project language rules.
 ## Marketplace Registration
 
 All plugins are registered in `.claude-plugin/marketplace.json`. When adding a new plugin, add an entry:

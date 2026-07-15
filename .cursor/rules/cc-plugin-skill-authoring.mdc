@@ -1,0 +1,32 @@
+---
+description: Skill authoring — English SKILL.md only (glob-scoped to reduce token load)
+globs: "**/skills/**/SKILL.md"
+alwaysApply: false
+---
+
+# Skill authoring (English)
+
+Applies when creating or editing `SKILL.md` under any `skills/` directory.
+
+## Language
+
+- Write **`SKILL.md` in English**.
+- Keep wording tight: short steps, tables over long prose — skills load into agent context.
+- Frontmatter `description`: English, third person, WHAT + WHEN / trigger terms.
+
+## Scope of this rule
+
+- **In scope**: `**/skills/**/SKILL.md` only (not always-on — limits token load).
+- **Out of scope**: companion templates used as runtime output mirrors, `AGENTS.md` / `CLAUDE.md`, issue/PR bodies, investigate/design artifacts.
+
+## Output vs instructions
+
+- Skill **instructions** = English.
+- **Runtime artifacts** the skill tells the agent to produce (issue body, PR text, domain docs) follow **project** language rules (e.g. Vietnamese for user-facing issue/PR when `AGENTS.md` requires it).
+
+## Checklist when adding a skill
+
+- [ ] Frontmatter: `name`, `description`, `user-invocable` / `argument-hint` as needed (see `CLAUDE.md`)
+- [ ] Instruction body in English; no Vietnamese prose in `SKILL.md`
+- [ ] Prefer linking a short template file over inlining large examples
+- [ ] Do not duplicate always-on narrative already covered by `AGENTS.md` or other rules

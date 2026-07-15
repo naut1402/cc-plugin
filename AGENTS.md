@@ -37,6 +37,7 @@ cc-plugin/
 - Giữ diff tối thiểu; tái dùng pattern có sẵn trong plugin liên quan.
 - Naming: `camelCase` (JS), `PascalCase` (Vue components nếu có), `kebab-case` (file agent `.md`).
 - Skill frontmatter: theo format trong `CLAUDE.md` — `name`, `description`, `user-invocable`.
+- Nội dung `SKILL.md`: **tiếng Anh** — rule glob-scoped [.cursor/rules/cc-plugin-skill-authoring.mdc](.cursor/rules/cc-plugin-skill-authoring.mdc) (chỉ khi mở/sửa file skill, giảm token).
 - Không thêm build step hay dependency mới trừ khi task yêu cầu rõ.
 
 ---

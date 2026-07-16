@@ -167,7 +167,7 @@ Trong pipeline `dev-agent-teams`, commit của bước implement được phép 
 wip: implement <task-id>
 ```
 
-Đây là **marker nhận diện** cho bước PR sau (`pr-creator` amend sang format §6.4). Không dùng `wip:` làm commit message merge cuối lên `main`.
+Đây là **marker nhận diện** cho bước tạo PR sau đó (amend sang format §6.4). Không dùng `wip:` làm commit message merge cuối lên `main`.
 
 ---
 

@@ -122,6 +122,29 @@ Ngoại lệ: PR body vẫn phải có `Part of #n` ở đầu — PR là artifa
 
 Ví dụ: thay vì ghi lý do sửa theo số issue → mô tả quy tắc hiện hành: `Commit message KHÔNG chứa trailer đồng-tác-giả.`
 
+### 6.6 Đối ứng review comment trên PR
+
+Khi PR có review comment (human hoặc bot review), AI agent **bắt buộc** xử lý theo thread, không chỉ sửa code im lặng.
+
+1. **Đọc từng thread** review (inline / conversation liên quan finding). Phân loại mỗi finding:
+   - **Áp dụng** — sẽ sửa trong branch PR
+   - **Không áp dụng** — giữ nguyên, có lý do rõ (convention cố ý, ngoài scope, false positive, …)
+2. **Áp dụng**: sửa → commit → push → **reply ngay trên đúng thread** đó. Reply nêu ngắn: đã sửa gì / file hoặc bước liên quan (có thể kèm short hash commit).
+3. **Không áp dụng**: vẫn **reply trên đúng thread**, giải thích lý do — không bỏ qua im lặng.
+4. Ngôn ngữ reply: **tiếng Việt** (comment hướng PR). Viết ngắn, không paste lại cả finding.
+5. Comment tổng hợp ở conversation PR (bảng “Finding → xử lý”) là **bổ sung**, không thay thế reply từng thread đã đối ứng.
+6. Không resolve/đóng thread hộ reviewer trừ khi human yêu cầu hoặc quy trình repo cho phép rõ.
+
+### 6.7 Commit tạm của pipeline implement
+
+Trong pipeline `dev-agent-teams`, commit của bước implement được phép dùng subject tạm:
+
+```text
+wip: implement <task-id>
+```
+
+Đây là **marker nhận diện** cho bước PR sau (`pr-creator` amend sang format §6.4). Không dùng `wip:` làm commit message merge cuối lên `main`.
+
 ---
 
 ## 7. Git hygiene — branch, commit & PR

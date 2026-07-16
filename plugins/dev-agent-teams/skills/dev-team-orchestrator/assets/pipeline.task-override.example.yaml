@@ -16,10 +16,10 @@ defaults:
   auto_review: true
 
 steps:
-  # Opt-in PHPStan cho task PHP (hanbai-product) — mặc định pipeline không chạy:
+  # Opt-in lint — tool/command lấy từ project-rules.md (AGENTS/CLAUDE/rules):
   - id: implementer
-    skills: [coding-rules, run-phpstan]
-    produces: [phpstan.md]
+    skills: [coding-rules, run-lint]
+    produces: [lint.md]
 
   # Đè skill của reviewer cho task này:
   - id: reviewer

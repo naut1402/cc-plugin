@@ -35,7 +35,7 @@ Quét hội thoại và tool calls trong session hiện tại. Liệt kê **các
 | `hitl-1` | User approve investigate, doc-review gate |
 | `designer` | Spawn designer, ghi `design.md` |
 | `hitl-2` | User approve design |
-| `implementer` | Code changes, `phpstan.md` |
+| `implementer` | Code changes, `lint.md` (nếu opt-in) |
 | `reviewer` | `review.md`, `test-spec.md` |
 | `hitl-3` | User review git diff |
 | `pr-creator` | `pr-desc.md` |

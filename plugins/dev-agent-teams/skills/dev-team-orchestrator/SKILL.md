@@ -48,7 +48,7 @@ Chỉ đọc/ghi dưới root thống nhất `.dev-team-agent/` ở repository r
     design.md
     investigate-po.md
     design-po.md
-    phpstan.md              # chỉ khi step implementer opt-in run-phpstan
+    lint.md                 # chỉ khi step implementer opt-in run-lint
     review.md
     test-spec.md
     pr-desc.md
@@ -56,7 +56,7 @@ Chỉ đọc/ghi dưới root thống nhất `.dev-team-agent/` ở repository r
     pipeline-export.json
 ```
 
-Artifact thực tế phụ thuộc `steps[].produces` trong config. Default không yêu cầu `phpstan.md`. Không suy luận phase hoàn tất từ tên phase; suy luận từ artifact được khai báo và tính hợp lệ tối thiểu của nội dung.
+Artifact thực tế phụ thuộc `steps[].produces` trong config. Default không yêu cầu `lint.md`. Không suy luận phase hoàn tất từ tên phase; suy luận từ artifact được khai báo và tính hợp lệ tối thiểu của nội dung.
 
 ## Remote dashboard (F0003 / agent-workflow#39)
 

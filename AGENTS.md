@@ -49,7 +49,7 @@ Repo **không có** test suite tự động cho nội dung Markdown skill.
 | Loại thay đổi | Cách verify |
 |---------------|-------------|
 | Skill/agent Markdown | Review diff thủ công; kiểm tra frontmatter và link nội bộ |
-| Script trong plugin (`.mjs`, `.js`) | Chạy script liên quan nếu có; không bắt buộc PHPStan |
+| Script trong plugin (`.mjs`, `.js`) | Chạy script liên quan nếu có; không bắt buộc lint runner riêng |
 | Dashboard viewer (trong plugin, app tách repo) | `npm run build` và Playwright trên repo `agent-workflow` |
 
 PR checklist ghi rõ manual review khi không có runner tự động.

@@ -37,8 +37,30 @@ cc-plugin/
 - Giữ diff tối thiểu; tái dùng pattern có sẵn trong plugin liên quan.
 - Naming: `camelCase` (JS), `PascalCase` (Vue components nếu có), `kebab-case` (file agent `.md`).
 - Skill frontmatter: theo format trong `CLAUDE.md` — `name`, `description`, `user-invocable`.
-- Nội dung `SKILL.md`: **tiếng Anh** — rule glob-scoped [.cursor/rules/cc-plugin-skill-authoring.mdc](.cursor/rules/cc-plugin-skill-authoring.mdc) (chỉ khi mở/sửa file skill, giảm token).
 - Không thêm build step hay dependency mới trừ khi task yêu cầu rõ.
+
+### 3.1 Skill (`SKILL.md`) — bắt buộc tiếng Anh
+
+Áp dụng cho mọi file `plugins/*/skills/*/SKILL.md` (tạo mới hoặc sửa).
+
+| Phần | Ngôn ngữ | Ghi chú |
+|------|----------|---------|
+| Body hướng dẫn (instructions) | **English** | Short steps, tables over long prose — skill nạp vào context agent |
+| Frontmatter `description` | **English** | Third person; WHAT + WHEN / trigger terms |
+| Artifact runtime skill yêu cầu sinh ra (issue/PR body, doc điều tra, …) | Theo quy ước project (§6.3) | Ví dụ: tiếng Việt cho PR/issue hướng người dùng |
+
+**Cấm** prose tiếng Việt trong phần instructions của `SKILL.md`.
+
+Ngoài phạm vi rule này: agent `.md`, `AGENTS.md` / `CLAUDE.md`, template companion, artifact `.dev-team-agent/`.
+
+Checklist khi thêm/sửa skill:
+
+- [ ] Frontmatter đủ `name`, `description`, `user-invocable` / `argument-hint` khi cần
+- [ ] Instruction body English; không lẫn Vietnamese prose
+- [ ] Ưu tiên link template ngắn hơn inline ví dụ dài
+- [ ] Không trùng narrative đã có trong `AGENTS.md` / rule khác
+
+Cursor có rule glob-scoped nhắc lại khi mở file skill: [.cursor/rules/cc-plugin-skill-authoring.mdc](.cursor/rules/cc-plugin-skill-authoring.mdc) (giảm token; **AGENTS.md là nguồn đúng** nếu xung đột).
 
 ---
 
@@ -78,7 +100,9 @@ Tiếng Việt, dạng checklist theo module/chức năng — comment lên PR kh
 
 ### 6.3 Ngôn ngữ tài liệu
 
-Tài liệu & comment hướng người dùng/PR: tiếng Việt. Comment kỹ thuật trong code/skill: ngắn gọn, theo mật độ xung quanh.
+- Tài liệu & comment hướng người dùng/PR: tiếng Việt.
+- Comment kỹ thuật trong code/agent: ngắn gọn, theo mật độ xung quanh.
+- **`SKILL.md`**: bắt buộc English — xem §3.1 (không áp dụng ngoại lệ tiếng Việt cho instructions skill).
 
 ### 6.4 Commit message, PR title & issue title
 

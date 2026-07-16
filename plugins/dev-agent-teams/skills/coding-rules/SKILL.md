@@ -46,7 +46,7 @@ Orchestrator đã nạp rule project và truyền "Rule coding" vào `.dev-team-
 
 ## PHPStan
 
-- Xem skill `run-phpstan` để biết cách chạy và đọc kết quả.
+- PHPStan: chỉ khi pipeline opt-in skill `run-phpstan` — xem skill đó để biết cách chạy và đọc kết quả.
 - Mục tiêu: 0 new errors so với `main`. Không cần fix lỗi cũ trừ khi trong scope.
 
 ## Review severity levels

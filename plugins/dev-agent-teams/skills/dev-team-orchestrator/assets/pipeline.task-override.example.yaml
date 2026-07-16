@@ -16,6 +16,11 @@ defaults:
   auto_review: true
 
 steps:
+  # Opt-in PHPStan cho task PHP (hanbai-product) — mặc định pipeline không chạy:
+  - id: implementer
+    skills: [coding-rules, run-phpstan]
+    produces: [phpstan.md]
+
   # Đè skill của reviewer cho task này:
   - id: reviewer
     skills: [coding-rules]      # bỏ write-tests

@@ -46,11 +46,11 @@ steps:
   - id: implementer
     name: Implement
     agent: dev-agent-teams:implementer
-    skills: [coding-rules, run-phpstan]
+    skills: [coding-rules]           # run-phpstan: opt-in qua per-task pipeline.yaml
     rule_category: coding
     rule_required: false             # thiếu rule thì fallback
     rule_fallback_skill: coding-rules
-    produces: [phpstan.md]
+    produces: []                     # phpstan.md chỉ khi step có skill run-phpstan
     export_key: implementer
     hitl:
       mode: none

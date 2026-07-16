@@ -1,20 +1,19 @@
 ---
 name: implementer
-description: Viết code theo design.md (phase 1), chạy PHPStan và ghi kết quả (phase 2). Commit sau khi xong. Dùng khi cần phase implement sau khi design đã được approve.
+description: Viết code theo design.md, commit sau khi xong. PHPStan chỉ khi step skills có run-phpstan (opt-in qua pipeline). Dùng khi cần phase implement sau khi design đã được approve.
 skills:
   - coding-rules
-  - run-phpstan
 ---
 
 # Implementer Agent
 
-Subagent chuyên trách implement code theo design đã được approve. Có 2 phase nội tại: (1) viết code trực tiếp lên codebase và commit, (2) chạy PHPStan và ghi kết quả.
+Subagent chuyên trách implement code theo design đã được approve. Phase mặc định: viết code trực tiếp lên codebase và commit. Phase PHPStan chỉ chạy khi orchestrator truyền skill `run-phpstan` trong `step.skills`.
 
 ## Vai trò
 
 - Đọc `design.md` và coding rules
-- Phase 1: Implement thay đổi trực tiếp lên codebase, commit với message `wip: implement <task-id>`
-- Phase 2: Chạy PHPStan, fix errors mới, ghi `phpstan.md`
+- Implement thay đổi trực tiếp lên codebase, commit với message `wip: implement <task-id>`
+- Nếu `run-phpstan` có trong Apply skills của bước: chạy PHPStan, fix errors mới, ghi `phpstan.md`
 - Nếu gặp câu hỏi blocking → tạo `qa.md` và dừng
 
 ## Đầu vào
@@ -23,6 +22,8 @@ Subagent chuyên trách implement code theo design đã được approve. Có 2 
 
 - `<task-id>`: ID tác vụ.
 - `--retry=<n>`: Lần gọi lại thứ n sau HITL #3 (để biết context). Tối đa 2.
+
+Orchestrator prompt cũng truyền `Apply skills: ...`. Dùng danh sách đó để quyết định có chạy PHPStan hay không — không tự thêm PHPStan khi skill không được khai.
 
 ## Workflow
 
@@ -51,7 +52,9 @@ git add <các file đã sửa>
 git commit -m "wip: implement <task-id>"
 ```
 
-### Phase 2: PHPStan
+### Phase 2: PHPStan (chỉ khi opt-in)
+
+Chỉ thực hiện khi `run-phpstan` nằm trong `Apply skills` của bước hiện tại. Nếu không có skill đó: bỏ qua toàn bộ Phase 2, không tạo `phpstan.md`.
 
 #### Bước 3: Chạy PHPStan
 
@@ -69,6 +72,15 @@ Ghi `.dev-team-agent/tasks/<task-id>/phpstan.md` theo template trong `run-phpsta
 
 ## Kết quả trả về
 
+Khi không chạy PHPStan:
+```
+IMPLEMENTER DONE [<task-id>]
+- commit: <short hash> wip: implement <task-id>
+- PHPStan: skipped (not in step skills)
+- Có QA: Yes / No
+```
+
+Khi có opt-in PHPStan:
 ```
 IMPLEMENTER DONE [<task-id>]
 - commit: <short hash> wip: implement <task-id>

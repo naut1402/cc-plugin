@@ -1,12 +1,14 @@
 ---
 name: run-phpstan
-description: Quy trình chạy PHPStan và đọc kết quả cho hanbai-product. Reference skill — dùng nội bộ bởi implementer agent.
+description: Quy trình chạy PHPStan và đọc kết quả cho hanbai-product. Reference skill — opt-in qua step skills (không mặc định trong pipeline).
 user-invocable: false
 ---
 
 # Run PHPStan
 
 Hướng dẫn chạy PHPStan và xử lý kết quả trong dự án 楽楽販売.
+
+**Opt-in**: Default pipeline không gắn skill này. Bật bằng per-task (hoặc global) `pipeline.yaml` trên step `implementer`: `skills: [coding-rules, run-phpstan]` và `produces: [phpstan.md]`.
 
 ## Chạy PHPStan
 

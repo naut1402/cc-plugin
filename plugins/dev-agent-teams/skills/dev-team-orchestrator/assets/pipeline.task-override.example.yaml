@@ -16,6 +16,11 @@ defaults:
   auto_review: true
 
 steps:
+  # Opt-in lint — tool/command lấy từ project-rules.md (AGENTS/CLAUDE/rules):
+  - id: implementer
+    skills: [coding-rules, run-lint]
+    produces: [lint.md]
+
   # Đè skill của reviewer cho task này:
   - id: reviewer
     skills: [coding-rules]      # bỏ write-tests

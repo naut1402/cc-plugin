@@ -6,7 +6,7 @@ user-invocable: false
 
 # Verify Dashboard
 
-Quy trình xác minh thay cho PHPStan trên repo cc-plugin.
+Verification flow used instead of `run-lint` for the cc-plugin dashboard app.
 
 > **App đã tách repo.** Source dashboard giờ ở [naut1402/agent-workflow](https://github.com/naut1402/agent-workflow). Việc verify chạy trong **bản clone** tại `$DEV_TEAM_DASHBOARD_APP` (mặc định `~/.dev-team-dashboard/app`), không còn trong `plugins/dev-agent-teams/`.
 

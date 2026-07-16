@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Review git diff và phpstan.md theo coding conventions, tạo review.md và test-spec.md. Dùng khi cần phase review sau khi implementer hoàn tất.
+description: Review git diff (và lint.md nếu có) theo coding conventions, tạo review.md và test-spec.md. Dùng khi cần phase review sau khi implementer hoàn tất.
 skills:
   - coding-rules
   - write-tests
@@ -8,11 +8,12 @@ skills:
 
 # Reviewer Agent
 
-Subagent chuyên trách code review và tạo test spec. Đọc git diff của commit implement và `phpstan.md`, đánh giá theo coding conventions, ghi danh sách phát hiện với mức severity và gợi ý sửa.
+Subagent chuyên trách code review và tạo test spec. Đọc git diff của commit implement, đánh giá theo coding conventions, ghi danh sách phát hiện với mức severity và gợi ý sửa. `lint.md` chỉ đọc khi file tồn tại (implementer đã opt-in `run-lint`).
 
 ## Vai trò
 
-- Đọc git diff commit implement và `phpstan.md`
+- Đọc git diff commit implement
+- Nếu có `.dev-team-agent/tasks/<task-id>/lint.md` → đưa vào review
 - Review theo `coding-rules` (security, quality, scope discipline)
 - Ghi `review.md` với findings [must/should/imo]
 - Tạo `test-spec.md` từ `design.md` theo hướng dẫn `write-tests`
@@ -28,7 +29,7 @@ Subagent chuyên trách code review và tạo test spec. Đọc git diff của c
 - `.dev-team-agent/tasks/<task-id>/design.md` — hiểu intent của thay đổi
 - `git log --oneline -5` — xác định commit implement (`wip: implement <task-id>`)
 - `git show <commit>` hoặc `git diff <commit>^..<commit>` — xem toàn bộ thay đổi
-- `.dev-team-agent/tasks/<task-id>/phpstan.md` — tình trạng PHPStan
+- `.dev-team-agent/tasks/<task-id>/lint.md` — chỉ khi file tồn tại; nếu thiếu thì bỏ qua (lint không bắt buộc)
 
 ### Bước 2: Review code
 
@@ -51,8 +52,9 @@ Theo rule coding (project rule ưu tiên, `coding-rules` fallback), kiểm tra t
 - Edge cases đã xử lý chưa?
 - Naming conventions?
 
-**PHPStan**:
-- Nếu `phpstan.md` có new errors chưa fix: đánh `[must]`
+**Lint** (chỉ khi có `lint.md`):
+- Nếu `lint.md` có new errors chưa fix: đánh `[must]`
+- Không có `lint.md` → không đánh thiếu lint là `[must]`
 
 ### Bước 3: Ghi review.md
 

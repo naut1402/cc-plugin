@@ -15,7 +15,7 @@ Orchestrator đã nạp rule project và truyền "Rule coding" vào `.dev-team-
 ## Nguyên tắc cốt lõi
 
 - **Không sửa ngoài scope fix**: Chỉ chỉnh code liên quan trực tiếp đến task. Không refactor cơ hội.
-- **PHPStan clean**: 0 new errors so với branch `main`. Không được tạo thêm lỗi PHPStan.
+- **Lint clean** (when pipeline opts in `run-lint`): 0 new errors vs `main`, using the tool declared in project-rules.
 - **Backward compatible**: Không thay đổi interface/signature của method đang được gọi từ nhiều nơi trừ khi design đã xác định rõ.
 
 ## Security
@@ -44,10 +44,11 @@ Orchestrator đã nạp rule project và truyền "Rule coding" vào `.dev-team-
 - Max line length: 120 characters
 - PHPDoc: bắt buộc cho public method
 
-## PHPStan
+## Lint
 
-- Xem skill `run-phpstan` để biết cách chạy và đọc kết quả.
-- Mục tiêu: 0 new errors so với `main`. Không cần fix lỗi cũ trừ khi trong scope.
+- Only when the pipeline opts in skill `run-lint` — see that skill.
+- Tool/command: read from `.dev-team-agent/project-rules.md` (AGENTS.md, CLAUDE.md, project rules). Do not hardcode a linter in this skill.
+- Goal: 0 new errors vs `main`. Do not require fixing pre-existing issues unless in task scope.
 
 ## Review severity levels
 

@@ -48,7 +48,7 @@ Chỉ đọc/ghi dưới root thống nhất `.dev-team-agent/` ở repository r
     design.md
     investigate-po.md
     design-po.md
-    phpstan.md
+    lint.md                 # only when implementer step opts in run-lint
     review.md
     test-spec.md
     pr-desc.md
@@ -56,7 +56,7 @@ Chỉ đọc/ghi dưới root thống nhất `.dev-team-agent/` ở repository r
     pipeline-export.json
 ```
 
-Artifact thực tế phụ thuộc `steps[].produces` trong config. Không suy luận phase hoàn tất từ tên phase; suy luận từ artifact được khai báo và tính hợp lệ tối thiểu của nội dung.
+Artifacts follow `steps[].produces` in config. Default does not require `lint.md`. Do not infer step completion from phase names; infer from declared artifacts and minimal content validity.
 
 ## Remote dashboard (F0003 / agent-workflow#39)
 

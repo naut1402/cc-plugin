@@ -37,8 +37,30 @@ cc-plugin/
 - Giữ diff tối thiểu; tái dùng pattern có sẵn trong plugin liên quan.
 - Naming: `camelCase` (JS), `PascalCase` (Vue components nếu có), `kebab-case` (file agent `.md`).
 - Skill frontmatter: theo format trong `CLAUDE.md` — `name`, `description`, `user-invocable`.
-- Nội dung `SKILL.md`: **tiếng Anh** — rule glob-scoped [.cursor/rules/cc-plugin-skill-authoring.mdc](.cursor/rules/cc-plugin-skill-authoring.mdc) (chỉ khi mở/sửa file skill, giảm token).
 - Không thêm build step hay dependency mới trừ khi task yêu cầu rõ.
+
+### 3.1 Skill (`SKILL.md`) — bắt buộc tiếng Anh
+
+Áp dụng cho mọi file `plugins/*/skills/*/SKILL.md` (tạo mới hoặc sửa).
+
+| Phần | Ngôn ngữ | Ghi chú |
+|------|----------|---------|
+| Body hướng dẫn (instructions) | **English** | Short steps, tables over long prose — skill nạp vào context agent |
+| Frontmatter `description` | **English** | Third person; WHAT + WHEN / trigger terms |
+| Artifact runtime skill yêu cầu sinh ra (issue/PR body, doc điều tra, …) | Theo quy ước project (§6.3) | Ví dụ: tiếng Việt cho PR/issue hướng người dùng |
+
+**Cấm** prose tiếng Việt trong phần instructions của `SKILL.md`.
+
+Ngoài phạm vi rule này: agent `.md`, `AGENTS.md` / `CLAUDE.md`, template companion, artifact `.dev-team-agent/`.
+
+Checklist khi thêm/sửa skill:
+
+- [ ] Frontmatter đủ `name`, `description`, `user-invocable` / `argument-hint` khi cần
+- [ ] Instruction body English; không lẫn Vietnamese prose
+- [ ] Ưu tiên link template ngắn hơn inline ví dụ dài
+- [ ] Không trùng narrative đã có trong `AGENTS.md` / rule khác
+
+Cursor có rule glob-scoped nhắc lại khi mở file skill: [.cursor/rules/cc-plugin-skill-authoring.mdc](.cursor/rules/cc-plugin-skill-authoring.mdc) (giảm token; **AGENTS.md là nguồn đúng** nếu xung đột).
 
 ---
 
@@ -49,7 +71,7 @@ Repo **không có** test suite tự động cho nội dung Markdown skill.
 | Loại thay đổi | Cách verify |
 |---------------|-------------|
 | Skill/agent Markdown | Review diff thủ công; kiểm tra frontmatter và link nội bộ |
-| Script trong plugin (`.mjs`, `.js`) | Chạy script liên quan nếu có; không bắt buộc PHPStan |
+| Script trong plugin (`.mjs`, `.js`) | Chạy script liên quan nếu có; không bắt buộc lint runner riêng |
 | Dashboard viewer (trong plugin, app tách repo) | `npm run build` và Playwright trên repo `agent-workflow` |
 
 PR checklist ghi rõ manual review khi không có runner tự động.
@@ -78,7 +100,9 @@ Tiếng Việt, dạng checklist theo module/chức năng — comment lên PR kh
 
 ### 6.3 Ngôn ngữ tài liệu
 
-Tài liệu & comment hướng người dùng/PR: tiếng Việt. Comment kỹ thuật trong code/skill: ngắn gọn, theo mật độ xung quanh.
+- Tài liệu & comment hướng người dùng/PR: tiếng Việt.
+- Comment kỹ thuật trong code/agent: ngắn gọn, theo mật độ xung quanh.
+- **`SKILL.md`**: bắt buộc English — xem §3.1 (không áp dụng ngoại lệ tiếng Việt cho instructions skill).
 
 ### 6.4 Commit message, PR title & issue title
 
@@ -121,6 +145,29 @@ Tài liệu tham khảo (`AGENTS.md`, `CLAUDE.md`, `SKILL.md`, `README.md`) mô 
 Ngoại lệ: PR body vẫn phải có `Part of #n` ở đầu — PR là artifact tạm thời, không phải tài liệu tham khảo lâu dài.
 
 Ví dụ: thay vì ghi lý do sửa theo số issue → mô tả quy tắc hiện hành: `Commit message KHÔNG chứa trailer đồng-tác-giả.`
+
+### 6.6 Đối ứng review comment trên PR
+
+Khi PR có review comment (human hoặc bot review), AI agent **bắt buộc** xử lý theo thread, không chỉ sửa code im lặng.
+
+1. **Đọc từng thread** review (inline / conversation liên quan finding). Phân loại mỗi finding:
+   - **Áp dụng** — sẽ sửa trong branch PR
+   - **Không áp dụng** — giữ nguyên, có lý do rõ (convention cố ý, ngoài scope, false positive, …)
+2. **Áp dụng**: sửa → commit → push → **reply ngay trên đúng thread** đó. Reply nêu ngắn: đã sửa gì / file hoặc bước liên quan (có thể kèm short hash commit).
+3. **Không áp dụng**: vẫn **reply trên đúng thread**, giải thích lý do — không bỏ qua im lặng.
+4. Ngôn ngữ reply: **tiếng Việt** (comment hướng PR). Viết ngắn, không paste lại cả finding.
+5. Comment tổng hợp ở conversation PR (bảng “Finding → xử lý”) là **bổ sung**, không thay thế reply từng thread đã đối ứng.
+6. Không resolve/đóng thread hộ reviewer trừ khi human yêu cầu hoặc quy trình repo cho phép rõ.
+
+### 6.7 Commit tạm của pipeline implement
+
+Trong pipeline `dev-agent-teams`, commit của bước implement được phép dùng subject tạm:
+
+```text
+wip: implement <task-id>
+```
+
+Đây là **marker nhận diện** cho bước tạo PR sau đó (amend sang format §6.4). Không dùng `wip:` làm commit message merge cuối lên `main`.
 
 ---
 

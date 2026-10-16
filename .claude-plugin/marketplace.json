@@ -28,6 +28,11 @@
       "source": "./plugins/task-memory-silverbullet"
     },
     {
+      "name": "silverbullet",
+      "description": "SilverBullet space over its HTTP API: notes, daily journal, tasks, hashtags, archive",
+      "source": "./plugins/silverbullet"
+    },
+    {
       "name": "document-writting",
       "description": "Claude Code plugin for Document Writting",
       "source": "./plugins/document-writting"

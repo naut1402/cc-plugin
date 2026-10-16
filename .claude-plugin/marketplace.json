@@ -28,6 +28,11 @@
       "source": "./plugins/task-memory-silverbullet"
     },
     {
+      "name": "silverbullet-notes",
+      "description": "Read, search and write notes in a SilverBullet space via its HTTP API",
+      "source": "./plugins/silverbullet-notes"
+    },
+    {
       "name": "document-writting",
       "description": "Claude Code plugin for Document Writting",
       "source": "./plugins/document-writting"

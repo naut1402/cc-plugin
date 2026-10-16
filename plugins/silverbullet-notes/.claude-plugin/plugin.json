@@ -1,0 +1,10 @@
+{
+  "name": "silverbullet-notes",
+  "description": "Read, search and write notes in a SilverBullet space via its HTTP API",
+  "version": "0.1.0",
+  "author": {
+    "name": "tttuan"
+  },
+  "license": "Apache-2.0",
+  "skills": ["./skills/"]
+}

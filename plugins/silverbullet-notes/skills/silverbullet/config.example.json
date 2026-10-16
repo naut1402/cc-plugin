@@ -1,0 +1,6 @@
+{
+  "url": "https://notes.example.com",
+  "token": "<SB_AUTH_TOKEN>",
+  "journalFolder": "Journal",
+  "journalTemplate": "Template-journal"
+}

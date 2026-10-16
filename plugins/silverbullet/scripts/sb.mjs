@@ -8,15 +8,31 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CONFIG_FILES = [join(here, "..", "config.json"), join(homedir(), ".config", "silverbullet", "config.json")];
+// Only a missing file moves on to the next one; a broken file stops here, so a typo
+// never silently switches to another server.
 let cfg = {};
 for (const file of CONFIG_FILES) {
-  try { cfg = JSON.parse(readFileSync(file, "utf8")); break; } catch {}
+  let raw;
+  try { raw = readFileSync(file, "utf8"); } catch (e) {
+    if (e.code === "ENOENT") continue;
+    die(`Cannot read ${file}: ${e.message}`);
+  }
+  try { cfg = JSON.parse(raw); } catch (e) { die(`Invalid JSON in ${file}: ${e.message}`); }
+  break;
 }
 const BASE = (process.env.SB_URL || cfg.url || "").replace(/\/+$/, "");
 const TOKEN = process.env.SB_TOKEN || cfg.token;
 const JOURNAL_FOLDER = cfg.journalFolder || "Journal";
 const JOURNAL_TEMPLATE = cfg.journalTemplate || "Template-journal";
 if (!BASE || !TOKEN) die(`Missing SB_URL/SB_TOKEN — set env vars or create one of:\n  ${CONFIG_FILES.join("\n  ")}`);
+
+// The bearer token never travels over plain HTTP, except to this machine or with explicit opt-in.
+let baseUrl;
+try { baseUrl = new URL(BASE); } catch { die(`Invalid server URL: ${BASE}`); }
+const LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
+if (baseUrl.protocol === "http:" && !LOOPBACK.includes(baseUrl.hostname) && process.env.SB_ALLOW_HTTP !== "1")
+  die(`Refusing to send the token over plain HTTP to ${baseUrl.host} — use https (or SB_ALLOW_HTTP=1 to accept the risk)`);
+if (!["http:", "https:"].includes(baseUrl.protocol)) die(`Unsupported URL scheme: ${baseUrl.protocol}`);
 
 const USAGE = `Usage: node sb.mjs <command> [args]
   ls [prefix] [--all] [--limit N]   list pages (newest first); --all includes attachments
@@ -49,12 +65,23 @@ function die(msg, code = 1) { process.stderr.write(msg + "\n"); process.exit(cod
 const toPath = (page) => (/\.[A-Za-z0-9]{1,6}$/.test(page) ? page : page + ".md");
 const enc = (p) => p.split("/").map(encodeURIComponent).join("/");
 
+// Authenticated fetch that never follows redirects: a 307/308 would replay the token
+// or a page body to another endpoint, and a redirected success would be misreported.
+async function authFetch(url, init = {}) {
+  try {
+    return await fetch(url, {
+      ...init,
+      redirect: "error",
+      headers: { Authorization: `Bearer ${TOKEN}`, "X-Sync-Mode": "true", ...init.headers },
+    });
+  } catch (e) {
+    const why = e.cause?.message ?? e.message;
+    die(`Request to ${url} failed: ${why}${/redirect/i.test(why) ? " — the server redirected; point SB_URL at the final https address" : ""}`);
+  }
+}
+
 async function req(method, path, body, extra = {}) {
-  const res = await fetch(`${BASE}/.fs/${enc(path)}`, {
-    method,
-    body,
-    headers: { Authorization: `Bearer ${TOKEN}`, "X-Sync-Mode": "true", ...extra },
-  });
+  const res = await authFetch(`${BASE}/.fs/${enc(path)}`, { method, body, headers: extra });
   if (res.status === 401) die("401 Unauthorized — check token");
   return res;
 }
@@ -101,7 +128,7 @@ async function ensureJournal(date) {
 }
 
 async function list() {
-  const res = await fetch(`${BASE}/.fs`, { headers: { Authorization: `Bearer ${TOKEN}`, "X-Sync-Mode": "true" } });
+  const res = await authFetch(`${BASE}/.fs`);
   if (!res.ok) die(`GET /.fs → ${res.status}`);
   return res.json();
 }

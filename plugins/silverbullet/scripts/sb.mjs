@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SilverBullet HTTP API client (/.fs).
-// Config: env SB_URL / SB_TOKEN, else first of <skill-dir>/config.json, ~/.config/silverbullet/config.json.
+// Config: env SB_URL / SB_TOKEN, else first of <plugin-root>/config.json, ~/.config/silverbullet/config.json.
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { homedir } from "node:os";

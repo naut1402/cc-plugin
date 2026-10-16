@@ -1,7 +1,7 @@
 {
-  "name": "silverbullet-notes",
-  "description": "Read, search and write notes in a SilverBullet space via its HTTP API",
-  "version": "0.1.0",
+  "name": "silverbullet",
+  "description": "SilverBullet space over its HTTP API: notes, daily journal, tasks, hashtags, archive",
+  "version": "0.2.0",
   "author": {
     "name": "tttuan"
   },

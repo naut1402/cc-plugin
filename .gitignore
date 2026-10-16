@@ -6,5 +6,5 @@
 # dev-agent-teams dashboard + state
 .dev-team-agent/
 
-# silverbullet-notes local credentials
-plugins/silverbullet-notes/skills/silverbullet/config.json
+# silverbullet local credentials
+plugins/silverbullet/config.json

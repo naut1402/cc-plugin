@@ -1,0 +1,10 @@
+{
+  "name": "daily-assistant",
+  "description": "Small recurring chores: end-of-day checklist, daily report, logwork check, task tracking, quick lookup, workspace tidy-up — driven by one personal config file",
+  "version": "0.0.1",
+  "author": {
+    "name": "tttuan"
+  },
+  "license": "Apache-2.0",
+  "skills": ["./skills/"]
+}

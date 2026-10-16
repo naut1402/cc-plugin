@@ -32,9 +32,9 @@ The portal has no API/MCP — work through the browser tool set in `logwork.brow
    |-----|--------|----------|-----|---------|
 
    Mark `✅` (= expected), `⚠️` (under/over), `❌` (nothing logged).
-   When every checked day is `✅`, run `DA mark logwork-ok`.
+   For each checked day that is `✅`, run `DA mark logwork-ok --date=<that day>` (never mark a day that was not checked).
 5. If there are gaps and not `--read-only`: propose entries to fill them, built from evidence — `DA today <date>` active time per task (≈), `DA commits <date>`, commits grouped by task ID, tracker tasks in `Doing`, the daily report draft if any, and logwork habits from `learn recall logwork` (e.g. fixed meeting entries). Show each proposed entry (date, task, hours, note) and ask the user to confirm/edit. Every correction the user makes → `learn capture` (habit, `src=check-logwork`).
-6. On confirmation (and not `--dry-run`): fill the portal form one entry at a time, take a snapshot before submitting, submit, then re-read the day to verify the total. Stop at the first error and report it. Today now complete → `DA mark logwork-ok`.
+6. On confirmation (and not `--dry-run`): fill the portal form one entry at a time, take a snapshot before submitting, submit, then re-read the day to verify the total. Stop at the first error and report it. Each day whose re-read total is now complete → `DA mark logwork-ok --date=<that day>`.
 7. Close any browser session/tab the skill opened.
 
 ## Rules

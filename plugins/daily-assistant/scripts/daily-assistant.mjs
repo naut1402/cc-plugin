@@ -5,12 +5,12 @@
 //   brief                                   compact status of today (≤ 8 lines)
 //   check [all|<id>] [--notify] [--force]   run watch.checks locally; prints only problems; exit 1 if any
 //   today [YYYY-MM-DD] [--json]             active time per task from the activity log
-//   mark <name> [note]                      append an end-of-day mark
+//   mark <name> [note] [--date=D]           append an end-of-day mark (for today or a past day)
 //   todo list [--all] | add "<text>" [--due=D] [--p=high|low] | done <n> | undo <n>     (file backend)
 //   commits [YYYY-MM-DD]                    own commits in report.sources.git_repos grouped by task
-//   tidy-plan [--inbox=a,b] [--dest=<layout>] [--json]   plan for sweeping inbox folders (no changes)
-//   tidy-apply [--only=1,2] [--assign=3:B4493] [--delete-dups]   apply the last plan (moves only by default)
-//   git-stale [--repos=a,b]                 merged / gone branches and stale worktrees (read-only)
+//   tidy-plan [--inbox=a,b] [--dest=<layout>] [--json]   plan for sweeping inbox folders (no changes), prints its id
+//   tidy-apply --plan=<id> [--only=1,2] [--assign=3:B4493] [--delete-dups]   apply that exact plan (moves only by default)
+//   git-stale [--repos=a,b]                 merged / gone branches and stale worktrees (fetch --prune, no branch changes)
 //   schedule show | install [--yes] | remove [--yes]    OS scheduler entries for watch.checks
 import {
   readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, renameSync, copyFileSync, unlinkSync,
@@ -193,7 +193,8 @@ function activity(date) {
     }
     close();
   }
-  const first = entries[0]?.t?.slice(11, 16), last = entries.at(-1)?.t?.slice(11, 16);
+  const own = entries.filter((e) => !e.for);  // marks filed later for this day carry the filing time
+  const first = own[0]?.t?.slice(11, 16), last = own.at(-1)?.t?.slice(11, 16);
   const gitEvents = entries.filter((e) => e.ev === 'git').map((e) => ({ t: e.t.slice(11, 16), sub: e.sub, branch: e.branch, tasks: e.tasks }));
   return { date, total, first, last, marks, byTask: [...perTask].sort((a, b) => b[1] - a[1]), spans, git: gitEvents };
 }
@@ -208,9 +209,11 @@ async function today() {
 }
 
 async function mark() {
-  if (!args[0]) { out('usage: mark <name> [note]'); return 2; }
-  appendLog(cfg, { ev: 'mark', name: args[0], note: args.slice(1).join(' ') || undefined });
-  out(`marked ${args[0]}`);
+  if (!args[0]) { out('usage: mark <name> [note] [--date=YYYY-MM-DD]'); return 2; }
+  const date = flags.date || now.date;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > now.date) { out(`invalid --date ${date} (YYYY-MM-DD, not in the future)`); return 2; }
+  appendLog(cfg, { ev: 'mark', name: args[0], note: args.slice(1).join(' ') || undefined }, date);
+  out(`marked ${args[0]} for ${date}`);
 }
 
 // ================================================================ todo (file backend)
@@ -313,9 +316,10 @@ async function tidyPlan() {
   const ignore = (a.ignore || []).map(globRe);
   const minAge = Number(a.min_age_days) || 0;
   const rows = [];
-  out(`inbox: ${inboxes.join(', ') || '(none)'} → dest: ${layout}`);
+  const missing = [];
+  if (!flags.json) out(`inbox: ${inboxes.join(', ') || '(none)'} → dest: ${layout}`);
   for (const dir of inboxes) {
-    if (!existsSync(dir)) { out(`  missing: ${dir}`); continue; }
+    if (!existsSync(dir)) { missing.push(dir); if (!flags.json) out(`  missing: ${dir}`); continue; }
     for (const name of readdirSync(dir)) {
       const src = join(dir, name);
       let st; try { st = statSync(src); } catch { continue; }
@@ -338,8 +342,10 @@ async function tidyPlan() {
       rows.push(row);
     }
   }
-  writeFileSync(planFile(), JSON.stringify({ created: now.time, layout, rows }, null, 1));
-  if (flags.json) { out(JSON.stringify(rows)); return; }
+  const id = createHash('sha1').update(JSON.stringify({ layout, rows })).digest('hex').slice(0, 8);
+  writeFileSync(planFile(), JSON.stringify({ id, created: now.time, layout, rows }, null, 1));
+  if (flags.json) { out(JSON.stringify({ id, inboxes, layout, missing, rows })); return; }
+  out(`plan ${id} (apply with --plan=${id})`);
   for (const r of rows) out(`${String(r.n).padStart(3)} ${r.action.padEnd(4)} ${r.name.slice(0, 60)} ${(r.size / 1024).toFixed(0)}K${r.dst ? ` → ${r.dst}` : ''}${r.note ? ` (${r.note})` : ''}`);
   if (!rows.length) out('nothing to tidy');
 }
@@ -347,6 +353,8 @@ async function tidyPlan() {
 async function tidyApply() {
   if (!existsSync(planFile())) { out('no plan — run tidy-plan first'); return 2; }
   const plan = JSON.parse(readFileSync(planFile(), 'utf8'));
+  // Row numbers are only meaningful for the plan the user saw and confirmed.
+  if (!flags.plan || flags.plan !== plan.id) { out(`plan mismatch: confirmed ${flags.plan || '(none)'}, current ${plan.id} — re-run tidy-plan and confirm again`); return 2; }
   const only = flags.only ? new Set(String(flags.only).split(',').map(Number)) : null;
   const assign = Object.fromEntries(String(flags.assign || '').split(',').filter(Boolean).map((p) => p.split(':')).map(([n, id]) => [Number(n), id]));
   let moved = 0, removed = 0, failed = 0;
@@ -367,6 +375,9 @@ async function tidyApply() {
         }
         moved++; out(`moved #${r.n} → ${dst}`);
       } else if (action === 'dup' && flags['delete-dups']) {
+        if (!existsSync(r.dst) || statSync(r.dst).size !== statSync(r.src).size || sha1(r.dst) !== sha1(r.src)) {
+          throw new Error('destination no longer identical — not deleted');
+        }
         unlinkSync(r.src); removed++; out(`removed duplicate #${r.n} ${r.name}`);
       }
     } catch (e) { failed++; out(`failed #${r.n} ${r.name}: ${e.message}`); }
@@ -379,10 +390,11 @@ async function gitStale() {
   const repos = (flags.repos ? String(flags.repos).split(',') : cfg.archive?.git?.repos || []).map(expandHome);
   const main = cfg.archive?.git?.main_branch || 'main';
   for (const r of repos) {
+    // Side effect: refreshes and prunes remote-tracking refs (needed to see "upstream gone"); local branches are untouched.
     git(r, ['fetch', '--prune', '--quiet'], 20000);
     const cur = git(r, ['rev-parse', '--abbrev-ref', 'HEAD']);
     const merged = (git(r, ['branch', '--format=%(refname:short)', '--merged', `origin/${main}`]) || '').split('\n').filter((b) => b && b !== main && b !== cur);
-    const gone = (git(r, ['branch', '--format=%(refname:short)\t%(upstream:track)']) || '').split('\n').filter((l) => l.includes('[gone]')).map((l) => l.split('\t')[0]).filter((b) => b !== cur);
+    const gone = (git(r, ['branch', '--format=%(refname:short)\t%(upstream:track)']) || '').split('\n').filter((l) => l.includes('[gone]')).map((l) => l.split('\t')[0]).filter((b) => b !== cur && b !== main);
     const wts = (git(r, ['worktree', 'list', '--porcelain']) || '').split('\n\n').slice(1).map((b) => ({ path: b.match(/^worktree (.*)$/m)?.[1], branch: b.match(/^branch refs\/heads\/(.*)$/m)?.[1], prunable: /^prunable/m.test(b) }));
     const staleWt = wts.filter((w) => w.prunable || (w.branch && merged.includes(w.branch)));
     out(`${basename(r)} (current ${cur})`);

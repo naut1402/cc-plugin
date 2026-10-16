@@ -142,6 +142,7 @@ watch:
     prompts: false              # also keep the first 120 chars of each prompt
     git: true                   # git commit/push/switch/merge, gh pr create/merge run inside Claude Code
   # Marks expected every working day; a missing one is reminded at the next day's first session.
+  # With report.slack.mode: draft (you send the draft yourself) use report-drafted instead of report-sent.
   required_marks: [report-sent, logwork-ok]
   autostart: false              # true: on startup the agent offers to install scheduled checks if none exist
   journal_section: "Activity log"   # heading used by "/watch flush" in today's journal
@@ -158,18 +159,18 @@ watch:
     - id: morning-todo
       cron: "57 8 * * 1-5"
       check: todo-due
-      remind: "/todo list"
+      remind: "/daily-assistant:todo list"
     - id: journal-written
       cron: "47 17 * * 1-5"
       check: "journal-section:Daily report"
-      remind: "/daily-report"
+      remind: "/daily-assistant:daily-report"
     - id: logwork-complete
       cron: "53 17 * * 1-5"
       check: logwork
-      remind: "/check-logwork --today"
+      remind: "/daily-assistant:check-logwork --today"
     - id: activity-to-journal
       cron: "13 10-18/2 * * 1-5"
-      action: "/watch flush"
+      action: "/daily-assistant:watch flush"
       enabled: false
 
 # ---------------------------------------------------------------- end of day

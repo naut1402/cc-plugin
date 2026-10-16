@@ -30,11 +30,11 @@ user-invocable: true
    | Habits | `learn recall daily-report` — preferred wording, section order, language quirks |
 
 3. Fill [report-template.md](report-template.md) in `report.language`. One bullet per task; merge sources for the same task ID. No invented items — if a section has nothing, write the template's empty marker.
-4. Show the report and ask for edits (single round, accept "ok"). Each edit the user makes → `learn capture` (habit, `src=daily-report`).
+4. Show the report and ask for edits (single round, accept "ok"). Each edit the user makes → `learn capture` (habit, `src=daily-report`), except under `--dry-run`.
 5. Deliver:
    - **Slack**: `mode: draft` → save as draft in `report.slack.channel` (or as reply to the thread matching `thread_search`). `mode: send` → send only after explicit confirmation.
    - **SilverBullet**: append under heading `report.silverbullet.section` in the day's journal page (create the heading if missing; never rewrite other sections).
-6. Record marks: `DA mark report-sent` after Slack, `DA mark journal-written` after SilverBullet. Skip on `--dry-run` / `chat`.
+6. Record marks for the report day (`--date=<date>`): `DA mark report-sent` only after a confirmed Slack send; `DA mark report-drafted` when only a draft was saved; `DA mark journal-written` after SilverBullet. Skip on `--dry-run` / `chat`.
 7. Print where it went (links when available).
 
 ## Rules

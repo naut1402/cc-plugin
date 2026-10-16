@@ -10,7 +10,7 @@ Single source of per-person / per-project settings for the `daily-assistant` plu
 
 ## Resolve the file
 
-1. `$DAILY_ASSISTANT_CONFIG` if set.
+1. `$DAILY_ASSISTANT_CONFIG` if set — expand a leading `~` and `$VAR` / `${VAR}` / `%VAR%`, then resolve to an absolute path (the scripts do the same).
 2. Otherwise `~/.daily-assistant/config.yaml`.
 3. Not found → stop the caller with:
    `⚠️ daily-assistant config not found. Run /init-daily-assistant to create it.`
@@ -56,11 +56,11 @@ Deterministic work runs in Node scripts, not in the model. The SessionStart hook
 | `DA brief` | Reading log, todo file and marks to say "what needs doing now" (≤ 8 lines) |
 | `DA check [all\|<id>] [--verbose]` | Evaluating watch checks; prints only problems, exit 1 if any |
 | `DA today [date] [--json]` | Summarizing the activity log (active time per task) |
-| `DA mark <name> [note]` | Appending end-of-day marks |
+| `DA mark <name> [note] [--date=D]` | Appending end-of-day marks (`--date` files the mark under the day that was actually checked) |
 | `DA todo list\|add\|done\|undo` | Editing the todo file (file backend) |
 | `DA commits [date]` | Collecting own commits by task |
-| `DA tidy-plan` / `DA tidy-apply` | Classifying and moving inbox files |
-| `DA git-stale` | Finding merged / gone branches and stale worktrees |
+| `DA tidy-plan` / `DA tidy-apply --plan=<id>` | Classifying and moving inbox files (apply is bound to the plan id the user confirmed) |
+| `DA git-stale` | Finding merged / gone branches and stale worktrees (runs `git fetch --prune`) |
 | `DA schedule show\|install\|remove` | OS-level schedule for checks (no Claude session needed) |
 
 Rules:

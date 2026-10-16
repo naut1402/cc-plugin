@@ -30,7 +30,7 @@ Locations are never hard-coded. For each one, the first available value wins:
 
 The script does listing, classification and moving (`DA` — see `assistant-config` → Scripts first).
 
-1. `DA tidy-plan [--inbox=<dir,...>] [--dest=<layout>]` → prints the resolved locations and a numbered plan, saved to `~/.daily-assistant/tidy-plan.json`. It lists top-level files of each inbox folder (skipping `archive.ignore` and files newer than `min_age_days`) and classifies them:
+1. `DA tidy-plan [--inbox=<dir,...>] [--dest=<layout>]` → prints the resolved locations, a plan id and a numbered plan, saved to `~/.daily-assistant/tidy-plan.json`. It lists top-level files of each inbox folder (skipping `archive.ignore` and files newer than `min_age_days`) and classifies them:
 
    | Action | Meaning |
    |--------|---------|
@@ -41,12 +41,12 @@ The script does listing, classification and moving (`DA` — see `assistant-conf
 
 2. Relay the plan as-is. For `ask` rows, suggest a task ID from `learn recall tidy-workspace` and the current branch; the user picks a task ID / keep / delete.
 3. Ask once for confirmation (user may exclude rows). `--dry-run` stops here.
-4. `DA tidy-apply --only=<n,...> [--assign=<n>:<TASK-ID>,...] [--delete-dups]` — moves only the confirmed rows (`--delete-dups` only if the user approved removing duplicates). Files the user chose to delete outside `dup` rows are removed one by one with explicit paths after a final confirmation.
+4. `DA tidy-apply --plan=<id shown in step 1> --only=<n,...> [--assign=<n>:<TASK-ID>,...] [--delete-dups]` — refuses if the saved plan is not the one the user confirmed (re-plan and confirm again); moves only the confirmed rows; `--delete-dups` only if the user approved removing duplicates, and each duplicate is re-verified (size + hash) right before deletion. Files the user chose to delete outside `dup` rows are removed one by one with explicit paths after a final confirmation.
 5. `learn capture` the user's choices for `ask` rows. Report the script's summary line.
 
 ## Git scope
 
-1. `DA git-stale [--repos=<dir,...>]` → per repo: branches merged into `origin/<main_branch>`, branches whose upstream is gone, stale worktrees (read-only; current and main branch excluded).
+1. `DA git-stale [--repos=<dir,...>]` → per repo: local branches merged into `origin/<main_branch>`, local branches whose upstream is gone (both exclude the current and main branch), and worktrees whose path is missing (prunable) or whose branch is merged. It first runs `git fetch --prune`, which updates and removes stale remote-tracking refs; it does not change local branches or worktrees.
 2. Relay the list; on confirmation run `git branch -d` (never `-D`), `git worktree remove` (never `--force`), `git worktree prune`. Anything refused by git stays and is reported.
 
 ## Rules

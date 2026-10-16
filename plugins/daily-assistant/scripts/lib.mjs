@@ -1,13 +1,17 @@
 // Shared helpers for daily-assistant scripts (no dependencies).
 import { readFileSync, appendFileSync, mkdirSync, existsSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-export const expandHome = (p) => String(p || '').replace(/^~(?=$|[\\/])/, homedir());
+// Leading ~ plus $VAR, ${VAR} and %VAR% (unset variables are left as written).
+export const expandHome = (p) => String(p || '')
+  .replace(/\$\{(\w+)\}|\$(\w+)|%(\w+)%/g, (m, a, b, c) => process.env[a || b || c] ?? m)
+  .replace(/^~(?=$|[\\/])/, homedir());
 
 export function configPath() {
-  return process.env.DAILY_ASSISTANT_CONFIG || join(homedir(), '.daily-assistant', 'config.yaml');
+  const override = process.env.DAILY_ASSISTANT_CONFIG;
+  return override ? resolve(expandHome(override)) : join(homedir(), '.daily-assistant', 'config.yaml');
 }
 
 export const homeDir = () => dirname(configPath());
@@ -136,11 +140,12 @@ export function readDay(dir, date) {
   return readFileSync(f, 'utf8').split('\n').filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } });
 }
 
-export function appendLog(cfg, entry) {
+// `forDate` files the entry under another day (e.g. a mark for a past day that was just checked).
+export function appendLog(cfg, entry, forDate) {
   const dir = logDir(cfg);
   const { date, time } = nowParts(tzOf(cfg));
   mkdirSync(dir, { recursive: true });
-  appendFileSync(join(dir, `${date}.jsonl`), JSON.stringify({ t: time, ...entry }) + '\n');
+  appendFileSync(join(dir, `${forDate || date}.jsonl`), JSON.stringify({ t: time, ...entry, ...(forDate && forDate !== date ? { for: forDate } : {}) }) + '\n');
 }
 
 // ---------------------------------------------------------------- pending reminders

@@ -30,11 +30,12 @@ Observation runs **without the model**; Claude is involved only when a check fai
 | `turn-end` | `sid` |
 | `mark` | `name`, `note` |
 
-**Marks** record that an end-of-day item happened. Skills write them with `DA mark <name> [note]`:
+**Marks** record that an end-of-day item happened. Skills write them with `DA mark <name> [note] [--date=<day checked>]`:
 
 | Mark | Written by |
 |------|-----------|
-| `report-sent` | `daily-report` after posting/drafting to Slack |
+| `report-sent` | `daily-report` after a confirmed Slack send |
+| `report-drafted` | `daily-report` when only a Slack draft was saved |
 | `journal-written` | `daily-report` / `watch flush` after writing the journal |
 | `logwork-ok` | `check-logwork` when the day's total meets `hours_per_day` |
 | `todo-reviewed` | `todo review` |

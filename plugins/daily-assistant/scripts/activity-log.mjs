@@ -94,7 +94,7 @@ function missedEarlier(dir, today, required) {
   if (!entries.some((e) => e.ev !== 'mark')) return [];
   const marks = new Set(entries.filter((e) => e.ev === 'mark').map((e) => e.name));
   const missing = required.filter((r) => !marks.has(r));
-  return missing.length ? [`On ${last} not recorded: ${missing.join(', ')}. Mention it briefly and offer to catch up (e.g. /daily-report --date=${last}, /check-logwork --date=${last}).`] : [];
+  return missing.length ? [`On ${last} not recorded: ${missing.join(', ')}. Mention it briefly and offer to catch up (e.g. /daily-assistant:daily-report --date=${last}, /daily-assistant:check-logwork --date=${last}).`] : [];
 }
 
 function prune(dir, today, keepDays) {

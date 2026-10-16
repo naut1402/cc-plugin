@@ -1,0 +1,177 @@
+# daily-assistant — personal config (one file per person).
+# Default location: ~/.daily-assistant/config.yaml
+# Override location with env var DAILY_ASSISTANT_CONFIG.
+# Anything left empty ("" / []) disables the related feature; skills say so and skip it.
+
+version: 1
+
+# ---------------------------------------------------------------- persona
+# How the assistant agent presents itself. Change freely; takes effect next conversation.
+persona:
+  name: "Assistant"             # display name the agent uses for itself
+  alias_agent: ""               # optional slug, e.g. "may": /init-daily-assistant --section=persona
+                                # installs ~/.claude/agents/<slug>.md so it can be started by that name
+  personality: >-               # free text: character, attitude, quirks
+    Calm, practical, a bit proactive; points out risks briefly; never pushy.
+  tone: friendly                # friendly | formal | concise | playful
+  language: vi                  # reply language
+  self_reference: ""            # how it refers to itself (e.g. "em", "mình", "tôi"); "" = avoid pronouns
+  address_user: ""              # how it addresses the user (e.g. "anh Tuấn", "bạn"); "" = "bạn"
+  emoji: light                  # none | light | rich
+  greeting: ""                  # optional fixed first line of each conversation
+
+# ---------------------------------------------------------------- self-learning memory
+memory:
+  backend: file                 # file | working-memory (uses the installed task-memory backend)
+  dir: "~/.daily-assistant/memory"
+  repeat_threshold: 3           # same choice seen N times -> proposed as a habit
+  review_days: 7                # activity window mined by /learn review
+  inbox_ttl_days: 30            # unconfirmed single-sighting candidates expire
+  stale_days: 90                # habits not re-confirmed are listed for re-check
+  never_learn: []               # regex patterns never captured
+
+user:
+  name: ""                      # display name, e.g. as shown on the logwork portal
+  email: ""                     # git author email used to collect commits
+  timezone: Asia/Ho_Chi_Minh
+  hours_per_day: 8              # expected logged hours per working day
+  working_days: [mon, tue, wed, thu, fri]
+
+# Task ID patterns (regex). First match in text/file names = task ID.
+task_id_patterns:
+  - 'B\d{4,5}'
+  - 'U\d{4,6}'
+  - 'F\d{3,6}(_[A-Za-z0-9]+)?'
+
+# ---------------------------------------------------------------- task tracker
+tracker:
+  type: gsheet                  # gsheet | none
+  spreadsheet_id: ""
+  sheet: ""                     # tab name; "" = first tab
+  header_row: 8                 # row holding column headers
+  first_data_row: 9
+  # Each task uses two rows: "Plan" then "Actual" (column plan_actual).
+  # Set to single-row if the tracker uses one row per task.
+  row_layout: plan-actual-pair  # plan-actual-pair | single-row
+  mine:                         # which rows are "my tasks"
+    column: pic
+    values: []                  # e.g. ["Green(Kiet)"]
+  columns:                      # logical name -> column letter
+    id: C
+    title: D
+    review_flags: E
+    size: F
+    pic: G
+    plan_actual: H
+    start: I
+    end: J
+    est_hours: L
+    actual_hours: M
+    rate_dd: Q
+    rate_imp: R
+    rate_test: S
+    rate_at: T
+    at_status: U
+    status: V
+  # Status values allowed in the status column (written on the Actual row).
+  statuses: ["", "Doing", "Done", "Skip", "--"]
+  done_statuses: ["Done", "Skip", "--"]
+
+# ---------------------------------------------------------------- logwork
+logwork:
+  type: web                     # web | none
+  url: ""                       # register page
+  login_url: ""                 # page the portal redirects to when not logged in
+  user_label: ""                # how the user appears in the portal (defaults to user.name)
+  browser: claude-in-chrome     # claude-in-chrome (reuses logged-in Chrome) | playwright
+  check_days: 5                 # how many past working days /check-logwork inspects
+
+# ---------------------------------------------------------------- daily report
+report:
+  language: vi                  # vi | ja | en
+  sources:
+    git_repos: []               # absolute paths of repos to scan for today's commits
+    tracker: true               # include my Doing tasks + progress
+    slack_activity: false       # include my own Slack messages of the day
+  slack:
+    enabled: false
+    channel: ""                 # e.g. "#daily-report"
+    thread_search: ""           # optional: post as reply to today's thread whose text contains this
+    mode: draft                 # draft | send   (send still asks for confirmation)
+  silverbullet:
+    enabled: false
+    section: "Daily report"     # heading inside today's journal page
+
+# ---------------------------------------------------------------- lookup
+lookup:
+  github_repos: []              # "owner/repo"
+  slack_channels: []            # channels searched for a task ID
+  drive_query: true             # search Google Drive by task ID
+
+# ---------------------------------------------------------------- todo
+todo:
+  backend: file                 # file | silverbullet | google-tasks
+  file: "~/.daily-assistant/todo.md"     # file backend
+  google_list: "My Tasks"       # google-tasks backend: task list name
+  keep_done_days: 7             # file backend: done items older than this move under "## Done"
+
+# ---------------------------------------------------------------- workspace tidy-up
+# Default locations only — /tidy-workspace accepts --inbox / --dest / --repos at run time.
+archive:
+  inbox_dirs: ["~/Downloads"]   # folders to sweep
+  root: "~/Documents"
+  project: ""                   # sub folder under root, e.g. "hanbai-product"
+  # Destination; placeholders: {root} {project} {task_id} {yyyy} {mm}
+  layout: "{root}/{project}/{task_id}"
+  unmatched: ask                # ask | keep   (files with no task ID; nothing is ever deleted without asking)
+  min_age_days: 0               # only touch files older than this
+  ignore: ["desktop.ini", "*.crdownload", "*.part"]
+  git:
+    repos: []                   # repos where merged branches / stale worktrees are checked
+    main_branch: main
+
+# ---------------------------------------------------------------- watch (activity log + scheduled checks)
+watch:
+  enabled: true
+  log_dir: "~/.daily-assistant/activity"  # one JSONL file per day, written by plugin hooks
+  retention_days: 60
+  capture:
+    sessions: true              # Claude Code session start / end, cwd, branch
+    turns: true                 # end of each assistant turn (for active-time estimates)
+    task_ids: true              # task IDs mentioned in prompts (IDs only)
+    prompts: false              # also keep the first 120 chars of each prompt
+    git: true                   # git commit/push/switch/merge, gh pr create/merge run inside Claude Code
+  # Marks expected every working day; a missing one is reminded at the next day's first session.
+  # With report.slack.mode: draft (you send the draft yourself) use report-drafted instead of report-sent.
+  required_marks: [report-sent, logwork-ok]
+  autostart: false              # true: on startup the agent offers to install scheduled checks if none exist
+  journal_section: "Activity log"   # heading used by "/watch flush" in today's journal
+  # Optional: lets the script verify journal sections itself (zero tokens). Empty = rely on the
+  # "journal-written" mark. SilverBullet: url of the space, page pattern, env var holding the token.
+  journal_http:
+    url: ""                     # e.g. "https://journal.example.com"
+    page: "Journal/{yyyy}-{mm}-{dd}"
+    token_env: ""               # e.g. "SB_TOKEN"
+  # Scheduled checks. "/watch start" installs them in the OS scheduler (run by the script, zero tokens;
+  # cron must be "<min> <hour> * * <dow>"). Checks with "action" need Claude and run only in-session.
+  # check: marker:<name> | journal-section:<heading> | logwork | todo-due
+  checks:
+    - id: morning-todo
+      cron: "57 8 * * 1-5"
+      check: todo-due
+      remind: "/daily-assistant:todo list"
+    - id: journal-written
+      cron: "47 17 * * 1-5"
+      check: "journal-section:Daily report"
+      remind: "/daily-assistant:daily-report"
+    - id: logwork-complete
+      cron: "53 17 * * 1-5"
+      check: logwork
+      remind: "/daily-assistant:check-logwork --today"
+    - id: activity-to-journal
+      cron: "13 10-18/2 * * 1-5"
+      action: "/daily-assistant:watch flush"
+      enabled: false
+
+# ---------------------------------------------------------------- end of day
+checklist: ""                   # path to a custom checklist; "" = plugin default

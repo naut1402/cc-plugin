@@ -46,6 +46,11 @@
       "name": "session-retrospective",
       "description": "Post-task knowledge distillation and pipeline analysis",
       "source": "./plugins/session-retrospective"
+    },
+    {
+      "name": "daily-assistant",
+      "description": "Small recurring chores: end-of-day checklist, daily report, logwork, task tracking, quick lookup, workspace tidy-up",
+      "source": "./plugins/daily-assistant"
     }
   ]
 }

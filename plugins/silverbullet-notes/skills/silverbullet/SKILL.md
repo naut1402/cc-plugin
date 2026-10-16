@@ -1,6 +1,6 @@
 ---
 name: silverbullet
-description: Read, search, create, edit and delete notes in the user's SilverBullet space over its HTTP API — daily journal, inbox quick notes, topic pages, hashtag stats and lookup, attachments. Edits stay scoped to the agent's own sections. Use when the user mentions SilverBullet, journal, nhật ký, inbox, quick note, hashtag, second brain, or asks to save or look up something in their notes.
+description: Read, search, create, edit and delete notes in the user's SilverBullet space over its HTTP API — daily journal, inbox quick notes, topic pages, hashtag stats and lookup, tasks (list, add, tick), attachments. Edits stay scoped to the agent's own sections. Use when the user mentions SilverBullet, journal, nhật ký, inbox, quick note, hashtag, task/todo, second brain, or asks to save or look up something in their notes.
 user-invocable: true
 argument-hint: "[what to read, find or write]"
 ---
@@ -30,6 +30,9 @@ $SB tagged reading --children       # where a tag (and its tag/child tags) is us
 $SB journal                         # today's journal (created from template if missing)
 printf '\n- new note\n' | $SB append "Journal/2026-01-15"
 $SB block "Journal/2026-01-15" my-entry entry.md   # upsert only the section owned by anchor $my-entry
+$SB tasks --tag reading --limit 20               # open tasks (page:line); --done / --all, --page prefix
+$SB task add "Read chapter 3 #reading"           # into "## To-do list" of today's journal
+$SB task done "Journal/2026-01-15:7" --expect "Read chapter 3"   # tick exactly that line (--undo reopens)
 $SB put "Inbox/2026-01-15/ideas" note.md   # new page; existing page needs --force
 $SB upload ./shot.png "Inbox/2026-01-15/shot.png"
 ```
@@ -68,6 +71,22 @@ Scope follows SilverBullet rules — queries depend on them:
 - Reuse before inventing: run `tags`. Use `/` for child tags (`topic/sub`) — tag pages show parent/child.
 - Put example tags in docs inside backticks so they are not indexed. Rename/merge tags only on explicit request.
 - In-page live stats: `${query[[from t = index.tags() group by t.name select {tag = name, count = #group} order by count desc]]}`; per-tag view: link `[[tag:<name>]]`.
+
+## Tasks
+
+Syntax (SilverBullet): list item + non-empty state + space — `- [ ] open`, `- [x] done`, custom `- [IN PROGRESS] …` (no `:` in states). `- []` and `- [text](url)` are not tasks. Tags inside the task line tag that task.
+
+| Request | Do |
+|---|---|
+| Open tasks, tasks by topic | `tasks` (+ `--tag`, `--page <prefix>`, `--limit`). The journal template and `Template/` pages are skipped |
+| Add a task to today's journal | `task add "<text> #tag"` — one line at the end of `## To-do list`, creating today's journal if needed; other page / section via `--page` / `--section` |
+| Tick a task | `tasks` to get `page:line`, then `task done <page:line> --expect "<distinctive words>"`; reopen with `--undo` |
+
+`task add` / `task done` change exactly one line, abort if the page changed meanwhile (exit 4) or the line no longer matches (exit 5, re-run `tasks`), and verify the write.
+
+## Lua queries
+
+`${query[[...]]}` runs in the browser against its index; the CLI cannot execute it. SilverBullet's Runtime API (`POST /.runtime/lua`, needs Chromium on the server) can — probe it with `curl -d '1 + 1'` before relying on it; a `503 runtime not ready` means it is unavailable. Otherwise write queries into pages for the user and answer with `tags` / `tagged` / `tasks`.
 
 ## Workflows
 

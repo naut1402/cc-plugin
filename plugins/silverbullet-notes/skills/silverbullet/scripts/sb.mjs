@@ -32,6 +32,13 @@ const USAGE = `Usage: node sb.mjs <command> [args]
                                     hashtag stats: pages, occurrences per scope, last used
   tagged <tag> [--children] [--scope page|item|task|para|heading]
                                     where a tag is used (--children also matches <tag>/...)
+  tasks [--tag T] [--page P] [--done|--all] [--limit N]
+                                    list open (or done / all) tasks as page:line [state] text, newest pages first
+  task add <text...> [--page P] [--section "## To-do list"]
+                                    insert one "- [ ] text" line at the end of that section's list
+                                    (default page: today's journal, created if missing)
+  task done <page:line> --expect <text> [--undo]
+                                    tick (or untick) exactly that task line; refuses if the line no longer matches
   journal [YYYY-MM-DD]              print today's (or given) journal, creating it from the journal template if missing
   upload <local-file> <remote-path> upload attachment (image, pdf, ...)
   download <remote-path> <local>    download attachment
@@ -69,6 +76,28 @@ async function readWithMeta(path) {
 async function writeText(path, text) {
   const res = await req("PUT", path, text, { "Content-Type": "text/markdown" });
   if (!res.ok) die(`PUT ${path} → ${res.status}`);
+}
+
+// Write `out` only if the page is still exactly `orig`, then read back to verify.
+// Returns the changed line range so callers can report it.
+async function guardedWrite(path, orig, out) {
+  const latest = await readWithMeta(path);
+  if (latest?.mtime !== orig.mtime || latest?.text !== orig.text) die(`${path} changed while editing — re-run`, 4);
+  await writeText(path, out);
+  if ((await readText(path)) !== out) die(`Verify failed: ${path} content differs after write`, 6);
+  const a = orig.text.split(/\r?\n/), b = out.split(/\r?\n/);
+  let p = 0; while (p < a.length && p < b.length && a[p] === b[p]) p++;
+  let q = 0; while (q < a.length - p && q < b.length - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
+  return `lines ${p + 1}-${b.length - q} changed; ${p} lines before and ${q} after untouched`;
+}
+
+async function ensureJournal(date) {
+  const path = `${JOURNAL_FOLDER}/${date}.md`;
+  if ((await readText(path)) === null) {
+    await writeText(path, (await readText(toPath(JOURNAL_TEMPLATE))) ?? "---\ntags: journal\n---\n");
+    process.stderr.write(`Created ${path} from ${JOURNAL_TEMPLATE}\n`);
+  }
+  return path;
 }
 
 async function list() {
@@ -128,6 +157,29 @@ function stripDirectives(text) {
   return out;
 }
 
+// Task line, as SilverBullet parses it: list marker + non-empty [state] + space/tab or end of line.
+// "[text](url)" links and "[]" are not tasks; states cannot contain ":".
+const TASK = /^(\s*(?:[-*+]|\d+\.)\s+)\[([^\]:]+)\]([ \t]+|$)(.*)$/;
+
+function scanTasks(text) {
+  const found = [];
+  const raw = text.split(/\r?\n/);
+  const lines = stripDirectives(text).split(/\r?\n/);
+  let n = 0;
+  if (lines[0] === "---") { const end = lines.indexOf("---", 1); if (end > 0) n = end + 1; }
+  let fence = false;
+  for (; n < lines.length; n++) {
+    if (/^\s*(```|~~~)/.test(lines[n])) { fence = !fence; continue; }
+    if (fence) continue;
+    const m = lines[n].match(TASK);
+    if (!m) continue;
+    const body = raw[n].match(TASK)?.[4] ?? m[4];
+    const tags = [...body.replace(/`[^`]*`/g, "").matchAll(HASHTAG)].map((x) => x[2]);
+    found.push({ line: n + 1, state: m[2], done: /^[xX]$/.test(m[2]), text: body.trim(), tags });
+  }
+  return found;
+}
+
 function scanTags(text) {
   const found = [];
   const lines = stripDirectives(text).split(/\r?\n/);
@@ -153,7 +205,7 @@ function scanTags(text) {
     if (fence) continue;
     const tags = [...line.replace(/`[^`]*`/g, "").matchAll(HASHTAG)].map((m) => m[2]).filter((t) => !/^\d+$/.test(t));
     if (!tags.length) continue;
-    let scope = /^\s*[-*+] \[[ xX]\]/.test(line) ? "task" : /^\s*([-*+]|\d+\.)\s/.test(line) ? "item" : /^#{1,6}\s/.test(line) ? "heading" : "para";
+    let scope = TASK.test(line) ? "task" : /^\s*([-*+]|\d+\.)\s/.test(line) ? "item" : /^#{1,6}\s/.test(line) ? "heading" : "para";
     if (scope === "para") {
       let a = n, b = n;
       while (a > start && lines[a - 1].trim() !== "") a--;
@@ -254,17 +306,78 @@ switch (cmd) {
 
     const out = next.join(eol);
     if (out === orig.text) { console.log(`Unchanged ${path}`); break; }
-    const latest = await readWithMeta(path);
-    if (latest?.mtime !== orig.mtime || latest?.text !== orig.text) die(`${path} changed while editing — re-run`, 4);
-    await writeText(path, out);
-    const check = await readText(path);
-    if (check !== out) die(`Verify failed: ${path} content differs after write`, 6);
-    // Report the changed line range
-    const a = orig.text.split(/\r?\n/), b = out.split(/\r?\n/);
-    let p = 0; while (p < a.length && p < b.length && a[p] === b[p]) p++;
-    let q = 0; while (q < a.length - p && q < b.length - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
-    console.log(`Block ${anchor} written to ${path}: lines ${p + 1}-${b.length - q} changed; ${p} lines before and ${q} after untouched`);
+    console.log(`Block ${anchor} written to ${path}: ${await guardedWrite(path, orig, out)}`);
     break;
+  }
+  case "tasks": {
+    const tag = opt(args, "--tag")?.replace(/^#/, "");
+    const prefix = opt(args, "--page") ?? "";
+    const done = opt(args, "--done", false), all = opt(args, "--all", false);
+    const limit = Number(opt(args, "--limit") ?? 0);
+    const isTemplate = (name) => name === JOURNAL_TEMPLATE || name.startsWith("Template/");
+    const pages = (await loadPages(prefix)).filter((p) => !isTemplate(p.name)).sort((a, b) => b.lastModified - a.lastModified);
+    let rows = [];
+    for (const p of pages) {
+      for (const t of scanTasks(p.text)) {
+        if (!all && t.done !== Boolean(done)) continue;
+        if (tag && !t.tags.some((x) => x === tag || x.startsWith(tag + "/"))) continue;
+        rows.push(`${p.name}:${t.line}\t[${t.state}]\t${t.text}`);
+      }
+    }
+    const total = rows.length;
+    if (limit) rows = rows.slice(0, limit);
+    console.log(rows.join("\n") || "No tasks");
+    if (total) console.log(`-- ${total} task(s)${limit && total > limit ? `, showing ${limit}` : ""}`);
+    break;
+  }
+  case "task": {
+    const sub = args.shift();
+    if (sub === "add") {
+      const pageArg = opt(args, "--page");
+      const section = (opt(args, "--section") ?? "## To-do list").trim();
+      const text = args.join(" ").trim();
+      if (!text) die(USAGE);
+      const path = pageArg ? toPath(pageArg) : await ensureJournal(today());
+      const orig = await readWithMeta(path);
+      if (orig === null) die(`Not found: ${path}`, 2);
+      const eol = orig.text.includes("\r\n") ? "\r\n" : "\n";
+      const lines = orig.text.split(/\r?\n/);
+      const h = lines.findIndex((l) => l.trim() === section);
+      if (h < 0) die(`Section "${section}" not found in ${path} — pass --section or add the heading first`, 2);
+      const level = (section.match(/^#+/) ?? [""])[0].length;
+      let end = lines.findIndex((l, i) => i > h && (/^\s*---\s*$/.test(l) || (level && /^(#+)\s/.test(l) && l.match(/^#+/)[0].length <= level)));
+      if (end < 0) end = lines.length;
+      let at = h + 1; // after the last list line (or its indented continuation) in the section
+      for (let i = h + 1; i < end; i++) if (lines[i].trim() !== "" && /^(\s+\S|\s*([-*+]|\d+\.)\s)/.test(lines[i])) at = i + 1;
+      lines.splice(at, 0, `- [ ] ${text}`);
+      console.log(`Added task at ${path.slice(0, -3)}:${at + 1} — ${await guardedWrite(path, orig, lines.join(eol))}`);
+      break;
+    }
+    if (sub === "done") {
+      const expect = opt(args, "--expect"), undo = opt(args, "--undo", false);
+      const spec = args[0] ?? "";
+      const sep = spec.lastIndexOf(":");
+      const page = spec.slice(0, sep), ln = Number(spec.slice(sep + 1));
+      if (sep < 1 || !ln || !expect) die("Usage: task done <page:line> --expect <text> [--undo]");
+      const path = toPath(page);
+      const orig = await readWithMeta(path);
+      if (orig === null) die(`Not found: ${page}`, 2);
+      const tasks = scanTasks(orig.text);
+      let t = tasks.find((x) => x.line === ln && x.text.includes(expect));
+      if (!t) {
+        const cands = tasks.filter((x) => x.text.includes(expect));
+        if (cands.length !== 1) die(`Line ${ln} is not a task containing "${expect}" and ${cands.length} other tasks match — re-run tasks to get the current line`, 5);
+        t = cands[0];
+        process.stderr.write(`Task moved: line ${ln} → ${t.line}\n`);
+      }
+      if (t.done === !undo) { console.log(`Already ${undo ? "open" : "done"}: ${page}:${t.line}`); break; }
+      const eol = orig.text.includes("\r\n") ? "\r\n" : "\n";
+      const lines = orig.text.split(/\r?\n/);
+      lines[t.line - 1] = lines[t.line - 1].replace(TASK, (m, pre, st, sp, rest) => `${pre}[${undo ? " " : "x"}]${sp}${rest}`);
+      console.log(`${undo ? "Reopened" : "Done"} ${page}:${t.line} — ${await guardedWrite(path, orig, lines.join(eol))}`);
+      break;
+    }
+    die(USAGE);
   }
   case "rm": {
     if (!args[0]) die(USAGE);
@@ -332,14 +445,7 @@ switch (cmd) {
   case "journal": {
     const date = args[0] ?? today();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) die("Date must be YYYY-MM-DD");
-    const path = `${JOURNAL_FOLDER}/${date}.md`;
-    let text = await readText(path);
-    if (text === null) {
-      text = (await readText(toPath(JOURNAL_TEMPLATE))) ?? "---\ntags: journal\n---\n";
-      await writeText(path, text);
-      process.stderr.write(`Created ${path} from ${JOURNAL_TEMPLATE}\n`);
-    }
-    process.stdout.write(text);
+    process.stdout.write(await readText(await ensureJournal(date)));
     break;
   }
   case "upload": {

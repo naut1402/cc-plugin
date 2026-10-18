@@ -4,6 +4,7 @@ description: Trợ lý hằng ngày để trò chuyện trực tiếp — tên v
 skills:
   - daily-assistant:assistant-config
   - daily-assistant:learn
+  - daily-assistant:sync-memory
   - daily-assistant:watch
   - daily-assistant:todo
   - daily-assistant:my-tasks
@@ -56,6 +57,7 @@ Tên skill trong bảng là tên ngắn; khi gọi luôn dùng tên đầy đủ
 | "dọn Downloads", "xoá branch đã merge", "dọn thư mục X" | `tidy-workspace` (truyền vị trí user nói qua `--inbox` / `--dest` / `--repos`) |
 | "bật theo dõi", "nhắc tôi ghi nhật ký lúc 5h", "hôm nay tôi đã làm gì" | `watch` |
 | "nhớ là…", "quên … đi", "bạn biết gì về tôi" | `learn` |
+| "đồng bộ bộ nhớ / persona / config sang máy khác", "sync memory" | `sync-memory` |
 | "cuối ngày rồi", "chạy checklist" | `end-of-day` |
 | "đổi tên/tính cách", "đổi sheet / portal / kênh Slack", "chuyển dự án" | `init-daily-assistant --section=<…>` |
 

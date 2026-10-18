@@ -30,6 +30,20 @@ memory:
   stale_days: 90                # habits not re-confirmed are listed for re-check
   never_learn: []               # regex patterns never captured
 
+# ---------------------------------------------------------------- memory sync
+# Shares learned memory, persona and chosen config sections between assistants / machines (/sync-memory).
+# This section itself is machine-local and never synced.
+sync:
+  source: none                  # none | silverbullet | working-memory (installed task-memory backend)
+  machine: ""                   # label of this machine; "" = hostname
+  silverbullet_root: "Assistant Memory"   # folder in the SilverBullet space (credentials: silverbullet plugin)
+  working_memory_prefix: "assistant-memory"  # key prefix in working memory
+  scopes: [memory, persona, config]          # memory = memory.dir (profile + knowledge)
+  # Top-level sections synced by the "config" scope. Leave out sections holding machine-local paths
+  # (archive, report, watch, memory, checklist) unless the paths are identical on every machine.
+  config_sections: [user, task_id_patterns, tracker, logwork, lookup, todo]
+  include_inbox: false          # also sync memory inbox.md (pending candidates)
+
 user:
   name: ""                      # display name, e.g. as shown on the logwork portal
   email: ""                     # git author email used to collect commits

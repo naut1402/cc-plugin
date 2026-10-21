@@ -16,3 +16,4 @@ Items run top to bottom. Copy this file, edit it, and point `checklist:` in the 
 - [ ] Activity of the day written into the journal :: /daily-assistant:watch flush
 - [ ] Todo reviewed and tomorrow's items scheduled :: /daily-assistant:todo review
 - [ ] Approve what the assistant learned today :: /daily-assistant:learn review
+- [ ] Capabilities and learnings of the day recorded, profile page updated :: /daily-assistant:evolution review

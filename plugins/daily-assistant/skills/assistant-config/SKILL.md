@@ -41,6 +41,7 @@ A section is **enabled** only when its required keys are non-empty. Callers chec
 | todo | `todo.backend` (+ `todo.google_list` for `google-tasks`) |
 | memory (learn) | `memory.backend` (+ installed task-memory backend for `working-memory`) |
 | memory sync | `sync.source != none` (+ SilverBullet credentials for `silverbullet`, installed task-memory backend for `working-memory`) |
+| evolution | `evolution.enabled` (+ SilverBullet credentials for the page push and guides) |
 | watch log | `watch.enabled`, `node` on PATH (hooks) |
 | watch checks | `watch.checks` non-empty |
 | archive files | inbox + destination resolvable (config `archive.*` or run-time `--inbox` / `--dest`) |
@@ -64,6 +65,7 @@ Deterministic work runs in Node scripts, not in the model. The SessionStart hook
 | `DA git-stale` | Finding merged / gone branches and stale worktrees (runs `git fetch --prune`) |
 | `DA schedule show\|install\|remove` | OS-level schedule for checks (no Claude session needed) |
 | `node ~/.daily-assistant/bin/memory-sync.mjs status\|plan\|apply\|commit` | Three-way compare / merge of memory, persona and config sections with the sync hub (`sync-memory`) |
+| `node ~/.daily-assistant/bin/evolution.mjs scan\|diff\|snapshot\|page` | Inventory of capabilities and learned memory, diff against the last snapshot, profile page render / push (`evolution`) |
 
 Rules:
 

@@ -44,6 +44,20 @@ sync:
   config_sections: [user, task_id_patterns, tracker, logwork, lookup, todo]
   include_inbox: false          # also sync memory inbox.md (pending candidates)
 
+# ---------------------------------------------------------------- evolution
+# What the agent can do and has learned (/evolution): daily diff into the journal, generated profile page,
+# per-tool integration guides. SilverBullet credentials come from the silverbullet plugin.
+evolution:
+  enabled: false
+  silverbullet_page: "Agent/Profile"        # generated, overwritten on every push
+  tools_root: "Agent/Tools"                 # guide pages; frontmatter "covers: [ids]" links them from the profile
+  credentials_root: "Agent/Credentials"     # credential attachments of guides
+  upload_credentials: false                 # true: guides may upload credential files (asks every time)
+  journal_section: "Evolution"              # heading of the day's entry in the journal
+  journal_block: "evolution"                # block id prefix -> <journal_block>-<YYYY-MM-DD>
+  projects: []                              # repos whose rules / project skills are tracked; [] = projects with Claude memory
+  language: ""                              # page labels: vi | en; "" = persona.language
+
 user:
   name: ""                      # display name, e.g. as shown on the logwork portal
   email: ""                     # git author email used to collect commits

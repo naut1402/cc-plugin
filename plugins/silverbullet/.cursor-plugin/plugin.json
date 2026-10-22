@@ -1,7 +1,7 @@
 {
   "name": "silverbullet",
   "description": "SilverBullet space over its HTTP API: notes, daily journal, tasks, hashtags, archive",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
     "name": "tttuan"
   },

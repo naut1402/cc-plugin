@@ -179,6 +179,7 @@ watch:
   journal_http:
     url: ""                     # e.g. "https://journal.example.com"
     page: "Journal/{yyyy}-{mm}-{dd}"
+    detail_page: ""             # two-tier journal: detail page also searched, e.g. "Journal/Assistant/{yyyy}-{mm}-{dd}"
     token_env: ""               # e.g. "SB_TOKEN"
   # Scheduled checks. "/watch start" installs them in the OS scheduler (run by the script, zero tokens;
   # cron must be "<min> <hour> * * <dow>"). Checks with "action" need Claude and run only in-session.

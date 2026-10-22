@@ -2,5 +2,10 @@
   "url": "https://notes.example.com",
   "token": "<SB_AUTH_TOKEN>",
   "journalFolder": "Journal",
-  "journalTemplate": "Template-journal"
+  "journalTemplate": "Template-journal",
+  "journalDetailFolder": "Journal/Assistant",
+  "journalDetailTag": "journal-detail",
+  "journalSummaryHeading": "Work log",
+  "journalSummaryBlock": "worklog",
+  "journalDetailLabel": "details"
 }

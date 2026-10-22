@@ -24,6 +24,13 @@ const BASE = (process.env.SB_URL || cfg.url || "").replace(/\/+$/, "");
 const TOKEN = process.env.SB_TOKEN || cfg.token;
 const JOURNAL_FOLDER = cfg.journalFolder || "Journal";
 const JOURNAL_TEMPLATE = cfg.journalTemplate || "Template-journal";
+// Two-tier journal (on when journalDetailFolder is set): details go to <detail folder>/<date>,
+// the day's journal keeps one summary line per entry, linked to its detail block.
+const DETAIL_FOLDER = (cfg.journalDetailFolder || "").replace(/\/+$/, "");
+const DETAIL_TAG = cfg.journalDetailTag || "journal-detail";
+const SUMMARY_HEADING = cfg.journalSummaryHeading || "Work log";
+const SUMMARY_BLOCK = cfg.journalSummaryBlock || "worklog";
+const DETAIL_LABEL = cfg.journalDetailLabel || "details";
 if (!BASE || !TOKEN) die(`Missing SB_URL/SB_TOKEN — set env vars or create one of:\n  ${CONFIG_FILES.join("\n  ")}`);
 
 // The bearer token never travels over plain HTTP, except to this machine or with explicit opt-in.
@@ -55,7 +62,11 @@ const USAGE = `Usage: node sb.mjs <command> [args]
                                     (default page: today's journal, created if missing)
   task done <page:line> --expect <text> [--undo]
                                     tick (or untick) exactly that task line; refuses if the line no longer matches
-  journal [YYYY-MM-DD]              print today's (or given) journal, creating it from the journal template if missing
+  journal [YYYY-MM-DD] [--detail]   print today's (or given) journal, creating it from the journal template if missing;
+                                    --detail prints the day's detail page instead (two-tier journal), created if missing
+  log <id> <summary...> [--detail <file>] [--date YYYY-MM-DD] [--time HH:MM]
+                                    journal entry: upsert block $id from <file> on the day's detail page, then upsert one
+                                    "- HH:MM <summary> ([[detail$id|label]])" line in the journal's summary block
   upload <local-file> <remote-path> upload attachment (image, pdf, ...)
   download <remote-path> <local>    download attachment
 Page names omit ".md" (e.g. "Journal/2026-10-16"); paths with another extension are used as-is.`;
@@ -125,6 +136,90 @@ async function ensureJournal(date) {
     process.stderr.write(`Created ${path} from ${JOURNAL_TEMPLATE}\n`);
   }
   return path;
+}
+
+// Page holding a day's journal details: the detail page when two-tier is on, else the journal itself.
+async function ensureDetail(date) {
+  if (!DETAIL_FOLDER) return ensureJournal(date);
+  const path = `${DETAIL_FOLDER}/${date}.md`;
+  if ((await readText(path)) === null) {
+    await writeText(path, `---\ntags: ${DETAIL_TAG}\n---\n← [[${JOURNAL_FOLDER}/${date}]]\n`);
+    process.stderr.write(`Created ${path}\n`);
+  }
+  return path;
+}
+
+const BLOCK_ID = /^[A-Za-z0-9][\w-]*$/;
+const anchorRe = (id) => new RegExp(`(^|\\s)\\$${id}(\\s|$)`);
+const isRule = (l) => /^\s*---\s*$/.test(l);
+
+// Upsert the section owned by anchor $id: from the anchor line up to the next "---" line.
+async function upsertBlock(path, id, text, adoptFile) {
+  const orig = await readWithMeta(path);
+  if (orig === null) die(`Not found: ${path} — create the page first`, 2);
+  const anchor = "$" + id;
+  const re = anchorRe(id);
+
+  let body = text.replace(/\s+$/, "").split("\n");
+  if (body.some(isRule)) die("Block content must not contain a '---' line (it ends the block)");
+  if (!body.some((l) => re.test(l))) body[0] += " " + anchor;
+
+  const eol = orig.text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = orig.text.split(/\r?\n/);
+  const starts = lines.flatMap((l, i) => (re.test(l) ? [i] : []));
+  if (starts.length > 1) die(`Anchor ${anchor} occurs ${starts.length} times — fix the page by hand`, 5);
+
+  let next;
+  if (starts.length === 1) {
+    const s = starts[0];
+    let e = lines.findIndex((l, i) => i > s && isRule(l));
+    if (e < 0) e = lines.length;
+    while (e - 1 > s && lines[e - 1].trim() === "") e--; // keep blank lines before the rule
+    next = [...lines.slice(0, s), ...body, ...lines.slice(e)];
+  } else if (adoptFile) {
+    const old = readFileSync(adoptFile, "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, "");
+    const flat = lines.join("\n");
+    const at = flat.indexOf(old);
+    if (at < 0 || flat.indexOf(old, at + 1) >= 0) die("--adopt text must occur exactly once in the page", 5);
+    const before = flat.slice(0, at).split("\n");
+    const after = flat.slice(at + old.length).split("\n");
+    if (before.pop() !== "" || after.shift() !== "") die("--adopt text must cover whole lines", 5);
+    const closed = after.find((l) => l.trim() !== "");
+    next = [...before, ...body, ...(closed !== undefined && isRule(closed) ? after : ["", "---", ...after])];
+  } else {
+    const trimmed = [...lines];
+    while (trimmed.length && trimmed[trimmed.length - 1].trim() === "") trimmed.pop();
+    const lastRule = trimmed.length && isRule(trimmed[trimmed.length - 1]);
+    next = [...trimmed, ...(lastRule ? [] : ["", "---"]), "", ...body, "", "---", ""];
+  }
+
+  const out = next.join(eol);
+  if (out === orig.text) return `Unchanged ${path}`;
+  return `Block ${anchor} written to ${path}: ${await guardedWrite(path, orig, out)}`;
+}
+
+// One summary line per entry in the journal's summary block, keyed by the $id in its link:
+// replaced when present, else added after the block's last line. Creates the block if missing.
+async function upsertSummaryLine(path, date, id, line) {
+  const blockId = `${SUMMARY_BLOCK}-${date}`;
+  const orig = await readWithMeta(path);
+  if (orig === null) die(`Not found: ${path}`, 2);
+  const eol = orig.text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = orig.text.split(/\r?\n/);
+  const s = lines.findIndex((l) => anchorRe(blockId).test(l));
+  if (s < 0) return upsertBlock(path, blockId, `## ${SUMMARY_HEADING}\n${line}`);
+  let e = lines.findIndex((l, i) => i > s && isRule(l));
+  if (e < 0) e = lines.length;
+  const own = lines.findIndex((l, i) => i > s && i < e && (l.includes(`$${id}|`) || l.includes(`$${id}]]`)));
+  if (own >= 0) {
+    if (lines[own] === line) return `Unchanged summary line in ${path}`;
+    lines[own] = line;
+  } else {
+    let at = s + 1;
+    for (let i = s + 1; i < e; i++) if (lines[i].trim() !== "") at = i + 1;
+    lines.splice(at, 0, line);
+  }
+  return `Summary line ${own >= 0 ? "updated" : "added"} in ${path}: ${await guardedWrite(path, orig, lines.join(eol))}`;
 }
 
 async function list() {
@@ -290,50 +385,29 @@ switch (cmd) {
     const adoptFile = opt(args, "--adopt");
     const [page, id, file] = args;
     if (!page || !id) die(USAGE);
-    if (!/^[A-Za-z0-9][\w-]*$/.test(id)) die("Block id: letters, digits, '-' or '_' only");
-    const path = toPath(page);
-    const orig = await readWithMeta(path);
-    if (orig === null) die(`Not found: ${page} — create the page first`, 2);
-    const anchor = "$" + id;
-    const anchorRe = new RegExp(`(^|\\s)\\$${id}(\\s|$)`);
-    const isRule = (l) => /^\s*---\s*$/.test(l);
-
-    let body = readInput(file).replace(/\s+$/, "").split("\n");
-    if (body.some(isRule)) die("Block content must not contain a '---' line (it ends the block)");
-    if (!body.some((l) => anchorRe.test(l))) body[0] += " " + anchor;
-
-    const eol = orig.text.includes("\r\n") ? "\r\n" : "\n";
-    const lines = orig.text.split(/\r?\n/);
-    const starts = lines.flatMap((l, i) => (anchorRe.test(l) ? [i] : []));
-    if (starts.length > 1) die(`Anchor ${anchor} occurs ${starts.length} times — fix the page by hand`, 5);
-
-    let next;
-    if (starts.length === 1) {
-      const s = starts[0];
-      let e = lines.findIndex((l, i) => i > s && isRule(l));
-      if (e < 0) e = lines.length;
-      while (e - 1 > s && lines[e - 1].trim() === "") e--; // keep blank lines before the rule
-      next = [...lines.slice(0, s), ...body, ...lines.slice(e)];
-    } else if (adoptFile) {
-      const old = readFileSync(adoptFile, "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, "");
-      const flat = lines.join("\n");
-      const at = flat.indexOf(old);
-      if (at < 0 || flat.indexOf(old, at + 1) >= 0) die("--adopt text must occur exactly once in the page", 5);
-      const before = flat.slice(0, at).split("\n");
-      const after = flat.slice(at + old.length).split("\n");
-      if (before.pop() !== "" || after.shift() !== "") die("--adopt text must cover whole lines", 5);
-      const closed = after.find((l) => l.trim() !== "");
-      next = [...before, ...body, ...(closed !== undefined && isRule(closed) ? after : ["", "---", ...after])];
-    } else {
-      const trimmed = [...lines];
-      while (trimmed.length && trimmed[trimmed.length - 1].trim() === "") trimmed.pop();
-      const lastRule = trimmed.length && isRule(trimmed[trimmed.length - 1]);
-      next = [...trimmed, ...(lastRule ? [] : ["", "---"]), "", ...body, "", "---", ""];
-    }
-
-    const out = next.join(eol);
-    if (out === orig.text) { console.log(`Unchanged ${path}`); break; }
-    console.log(`Block ${anchor} written to ${path}: ${await guardedWrite(path, orig, out)}`);
+    if (!BLOCK_ID.test(id)) die("Block id: letters, digits, '-' or '_' only");
+    console.log(await upsertBlock(toPath(page), id, readInput(file), adoptFile));
+    break;
+  }
+  case "log": {
+    const date = opt(args, "--date") ?? today();
+    const d = new Date();
+    const time = opt(args, "--time") ?? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const detailFile = opt(args, "--detail");
+    const [id, ...words] = args;
+    const summary = words.join(" ").trim();
+    if (!id || !summary) die(USAGE);
+    if (!BLOCK_ID.test(id)) die("Entry id: letters, digits, '-' or '_' only");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) die("Date must be YYYY-MM-DD");
+    if (!/^\d{2}:\d{2}$/.test(time)) die("Time must be HH:MM");
+    if (/[\r\n]/.test(summary)) die("Summary must be a single line");
+    const journalPath = await ensureJournal(date);
+    const detailPath = await ensureDetail(date);
+    if (detailFile) console.log(await upsertBlock(detailPath, id, readInput(detailFile)));
+    else if (!((await readText(detailPath)) ?? "").split(/\r?\n/).some((l) => anchorRe(id).test(l)))
+      die(`No block $${id} in ${detailPath} — pass --detail <file> to write it`, 2);
+    const line = `- ${time} ${summary} ([[${detailPath.slice(0, -3)}$${id}|${DETAIL_LABEL}]])`;
+    console.log(await upsertSummaryLine(journalPath, date, id, line));
     break;
   }
   case "tasks": {
@@ -470,9 +544,12 @@ switch (cmd) {
     break;
   }
   case "journal": {
+    const detail = opt(args, "--detail", false);
     const date = args[0] ?? today();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) die("Date must be YYYY-MM-DD");
-    process.stdout.write(await readText(await ensureJournal(date)));
+    if (detail && !DETAIL_FOLDER) die("--detail needs journalDetailFolder in the config (two-tier journal is off)");
+    const path = await ensureJournal(date);
+    process.stdout.write(await readText(detail ? await ensureDetail(date) : path));
     break;
   }
   case "upload": {

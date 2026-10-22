@@ -24,7 +24,7 @@ Run `$SB` with no args for full usage. Exit codes: 2 not found · 3 page exists 
 
 ## Setup (once)
 
-Config: env `SB_URL` / `SB_TOKEN`, else the first existing file of `${CLAUDE_PLUGIN_ROOT}/config.json`, `~/.config/silverbullet/config.json` (preferred — survives plugin updates). Copy `${CLAUDE_PLUGIN_ROOT}/config.example.json`, fill `url` + `token` (the server's `SB_AUTH_TOKEN`); `journalFolder` / `journalTemplate` are optional.
+Config: env `SB_URL` / `SB_TOKEN`, else the first existing file of `${CLAUDE_PLUGIN_ROOT}/config.json`, `~/.config/silverbullet/config.json` (preferred — survives plugin updates). Copy `${CLAUDE_PLUGIN_ROOT}/config.example.json`, fill `url` + `token` (the server's `SB_AUTH_TOKEN`); the `journal*` keys are optional (see silverbullet:journal).
 
 The CLI stops on: a config file that exists but is not valid JSON (it never falls back to another server); a plain `http://` URL other than localhost (the token would travel unencrypted — `SB_ALLOW_HTTP=1` overrides, at the user's risk); any redirect (set the final `https` address).
 

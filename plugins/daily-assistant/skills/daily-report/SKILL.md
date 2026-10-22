@@ -33,7 +33,7 @@ user-invocable: true
 4. Show the report and ask for edits (single round, accept "ok"). Each edit the user makes → `learn capture` (habit, `src=daily-report`), except under `--dry-run`.
 5. Deliver:
    - **Slack**: `mode: draft` → save as draft in `report.slack.channel` (or as reply to the thread matching `thread_search`). `mode: send` → send only after explicit confirmation.
-   - **SilverBullet**: append under heading `report.silverbullet.section` in the day's journal page (create the heading if missing; never rewrite other sections).
+   - **SilverBullet**: through `silverbullet:journal`, `log daily-report-<date> "<section>: <one-line gist>" --detail <report file> --date <date>`, where the report file starts with heading `## <report.silverbullet.section>`. Two-tier journal → the report lands on the detail page and the day's journal gets one summary line; otherwise the block goes into the day's journal. Re-running updates the same block and line; never rewrite other sections.
 6. Record marks for the report day (`--date=<date>`): `DA mark report-sent` only after a confirmed Slack send; `DA mark report-drafted` when only a draft was saved; `DA mark journal-written` after SilverBullet. Skip on `--dry-run` / `chat`.
 7. Print where it went (links when available).
 

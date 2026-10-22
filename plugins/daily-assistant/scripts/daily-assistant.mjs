@@ -117,21 +117,31 @@ function evaluate(c, act) {
   function fail(msg) { return { status: 'fail', msg }; }
 }
 
-// Optional: read today's journal page over HTTP (watch.journal_http.{url,page,token_env}). null = not configured / unreachable.
+// Optional: read today's journal page over HTTP (watch.journal_http.{url,page,detail_page,token_env}); with a
+// two-tier journal the section may sit on the detail page. null = not configured / unreachable.
 function journalHasSection(heading) {
   const j = cfg.watch?.journal_http || {};
   if (!j.url || !j.page) return null;
   const [y, m, d] = now.date.split('-');
-  const page = j.page.replace('{yyyy}', y).replace('{mm}', m).replace('{dd}', d);
-  try {
-    const headers = j.token_env && process.env[j.token_env] ? ['-H', `Authorization: Bearer ${process.env[j.token_env]}`] : [];
-    const text = execFileSync('curl', ['-sf', '-m', '8', ...headers, `${j.url.replace(/\/$/, '')}/.fs/${encodeURI(page)}.md`], { stdio: ['ignore', 'pipe', 'ignore'] }).toString();
-    const idx = text.split(/\r?\n/).findIndex((l) => /^#+\s/.test(l) && l.replace(/^#+\s*/, '').trim() === heading);
-    if (idx < 0) return false;
-    const after = text.split(/\r?\n/).slice(idx + 1);
-    const end = after.findIndex((l) => /^#+\s/.test(l));
-    return (end < 0 ? after : after.slice(0, end)).some((l) => l.trim());
-  } catch { return null; }
+  const pages = [j.page, j.detail_page].filter(Boolean).map((p) => p.replace('{yyyy}', y).replace('{mm}', m).replace('{dd}', d));
+  const headers = j.token_env && process.env[j.token_env] ? ['-H', `Authorization: Bearer ${process.env[j.token_env]}`] : [];
+  let found = null;
+  for (const page of pages) {
+    let text;
+    try {
+      text = execFileSync('curl', ['-sf', '-m', '8', ...headers, `${j.url.replace(/\/$/, '')}/.fs/${encodeURI(page)}.md`], { stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+    } catch { continue; }
+    // Heading text without SilverBullet block anchors ("## Daily report $daily-report-2026-10-22")
+    const title = (l) => l.replace(/^#+\s*/, '').replace(/(^|\s)\$[A-Za-z0-9][\w-]*(?=\s|$)/g, '').trim();
+    const lines = text.split(/\r?\n/);
+    const idx = lines.findIndex((l) => /^#+\s/.test(l) && title(l) === heading);
+    if (idx < 0) { found = false; continue; }
+    const after = lines.slice(idx + 1);
+    const end = after.findIndex((l) => /^#+\s/.test(l) || /^\s*---\s*$/.test(l)); // next heading or block end
+    if ((end < 0 ? after : after.slice(0, end)).some((l) => l.trim())) return true;
+    found = false;
+  }
+  return found;
 }
 
 async function check() {

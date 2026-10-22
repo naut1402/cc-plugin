@@ -52,7 +52,7 @@ Observation runs **without the model**; Claude is involved only when a check fai
 | `status` | `DA brief` + `DA schedule show`; nothing else |
 | `run <id>` | `DA check <id> --force`. Exit 0 → reply `✓ <id>` only. Exit 1 → relay the line and offer its `remind` command |
 | `today [date]` | `DA today [date]` — relay output; add interpretation only if asked |
-| `flush` | `DA today` → append the summary (not already flushed) under `watch.journal_section` in today's journal, then `DA mark journal-written flush` |
+| `flush` | `DA today` → through `silverbullet:journal`, `log activity-<date> "<journal_section>: <one-line gist>" --detail <file>`, file = heading `## <watch.journal_section>` + the day's summary (re-running replaces it, so nothing is duplicated), then `DA mark journal-written flush` |
 | `mark <name> [note]` | `DA mark <name> [note]` (e.g. the user wrote the journal by hand) |
 
 When a reminder arrives through hook context (`[daily-assistant] Reminder (…)`): mention it in one line and offer the suggested command; do not run checks again.
@@ -62,7 +62,7 @@ When a reminder arrives through hook context (`[daily-assistant] Reminder (…)`
 | `check` | Satisfied when |
 |---------|----------------|
 | `marker:<name>` | Mark `<name>` exists today |
-| `journal-section:<heading>` | `watch.journal_http` configured and today's page has `<heading>` with content; otherwise mark `journal-written` |
+| `journal-section:<heading>` | `watch.journal_http` configured and today's page — or its detail page (`detail_page`, two-tier journal) — has `<heading>` (block anchors ignored) with content; otherwise mark `journal-written` |
 | `logwork` | Mark `logwork-ok` today (the portal needs a browser, so only `/check-logwork` can set it) |
 | `todo-due` | No open todo overdue / due today (file backend; other backends → skipped by the script) |
 

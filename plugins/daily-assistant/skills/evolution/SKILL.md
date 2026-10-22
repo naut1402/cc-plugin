@@ -56,7 +56,7 @@ Snapshots (`~/.daily-assistant/evolution/snapshots/<date>.json`) hold names and 
    - Learned: new entries grouped by project, one short line each; master-related ones (`user`, `feedback`, habits) under their own sub-heading.
 4. If master-related entries changed, propose an updated portrait: 3–6 bullets (working style, communication, priorities, red lines), each traceable to entries. Current text: `~/.daily-assistant/evolution/portrait.md`.
 5. Show the draft (and portrait diff), ask once, then on approval:
-   - Journal: upsert block `<journal_block>-<date>` with heading `## <journal_section>` in today's journal through the `silverbullet:journal` skill (`block` command). No SilverBullet plugin → print the block in chat.
+   - Journal: through the `silverbullet:journal` skill, `log <journal_block>-<date> "<journal_section>: <one-line gist>" --detail <entry file>`, entry starting with heading `## <journal_section>` (detail page when the journal is two-tier, summary line in today's journal). No SilverBullet plugin → print the block in chat.
    - Portrait: write `portrait.md`.
 6. `EV snapshot` (unless `--dry-run`), then `EV page --push` after confirmation (one question may cover step 5 and this push).
 7. Each added tool / MCP without a guide → offer `guide <tool>` (one question listing them).

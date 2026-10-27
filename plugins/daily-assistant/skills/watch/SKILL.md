@@ -11,7 +11,7 @@ Observation runs **without the model**; Claude is involved only when a check fai
 
 | Layer | Runs | Tokens |
 |-------|------|--------|
-| Activity log | Plugin hooks → `scripts/activity-log.mjs` on SessionStart / UserPromptSubmit / PostToolUse(Bash) / Stop / SessionEnd | 0 — hook injects context only when something needs attention |
+| Activity log | Plugin hooks → `scripts/activity-log.mjs` on SessionStart / UserPromptSubmit / PostToolUse(Bash, PowerShell) / Stop / SessionEnd | 0 — hook injects context only when something needs attention |
 | Scheduled checks | OS scheduler (Windows Task Scheduler / cron) → `DA check <id> --notify` | 0 — on failure: desktop notification + entry in `~/.daily-assistant/pending.json` |
 | Reminder delivery | Next SessionStart / UserPromptSubmit hook reads unseen `pending.json` items once | a few lines of context |
 | In-session fallback | `CronCreate` — only for checks with `action` (need Claude) | one short turn per fire |
@@ -27,6 +27,7 @@ Observation runs **without the model**; Claude is involved only when a check fai
 | `session-start` / `session-end` | `sid`, `source` / `reason`, `cwd`, `branch`, `tasks` |
 | `prompt` | `sid`, `tasks` (IDs found), `preview` only if `capture.prompts` |
 | `git` | `sid`, `sub` (commit, push, switch, …, pr-create), `cwd`, `branch`, `tasks` |
+| `bash` | `sid`, `tool` (Bash / PowerShell), `cwd`, `cmd` (verbatim, ≤ `capture.bash_max_chars`), `ms` — only if `capture.bash`; aggregated by `usage commands`, never shown unredacted |
 | `turn-end` | `sid` |
 | `mark` | `name`, `note` |
 
@@ -40,6 +41,7 @@ Observation runs **without the model**; Claude is involved only when a check fai
 | `logwork-ok` | `check-logwork` when the day's total meets `hours_per_day` |
 | `todo-reviewed` | `todo review` |
 | `eod-done` | `end-of-day` at the end of the run |
+| `usage-saved` | `usage day` after the day's usage block was written to the journal |
 
 ## Commands
 

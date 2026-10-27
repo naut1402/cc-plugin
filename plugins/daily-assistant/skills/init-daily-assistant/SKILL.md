@@ -1,7 +1,7 @@
 ---
 name: init-daily-assistant
 description: Creates or updates the daily-assistant personal config file (~/.daily-assistant/config.yaml) — either bootstrapped from a sync hub (SilverBullet or working memory) or by interviewing the user about their task tracker, logwork portal, report destinations and archive folders. Use on first install, on a new machine, when moving to a new project, or when the user says /init-daily-assistant.
-argument-hint: "[--force] [--from=silverbullet|working-memory|none] [--section=persona|user|tracker|logwork|report|lookup|todo|archive|memory|sync|evolution|watch]"
+argument-hint: "[--force] [--from=silverbullet|working-memory|none] [--section=persona|user|tracker|logwork|report|lookup|todo|archive|memory|sync|evolution|watch|usage|handover]"
 user-invocable: true
 ---
 
@@ -51,6 +51,8 @@ Scaffold the personal config consumed by every `daily-assistant` skill. Template
    | sync | source (`none` / `silverbullet` / `working-memory`) — check the prerequisite below; scopes, config sections, machine label. After enabling on an existing config, offer `/daily-assistant:sync-memory status` |
    | watch | capture options (prompts off by default), required marks, check times, autostart |
    | evolution | on/off; profile page and guide folders on SilverBullet; whether guides may upload credential files; journal heading; tracked projects (default: projects with Claude memory). After enabling, run `/daily-assistant:evolution review` once to create the baseline |
+| usage | on/off; handover threshold %; usually keep the default weights. After enabling, offer `/daily-assistant:usage setup` (status line wrapper) |
+| handover | local folder; push to SilverBullet or not; runbook page and task folder |
 
 5. Show the diff between the current file (or empty) and the proposal; write only after the user confirms (create the parent dir then).
 6. Print the feature-gate table (enabled / skipped + missing keys) and suggest `/end-of-day` as the next command.

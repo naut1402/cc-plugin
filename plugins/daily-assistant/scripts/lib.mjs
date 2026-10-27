@@ -148,6 +148,9 @@ export function appendLog(cfg, entry, forDate) {
   appendFileSync(join(dir, `${forDate || date}.jsonl`), JSON.stringify({ t: time, ...entry, ...(forDate && forDate !== date ? { for: forDate } : {}) }) + '\n');
 }
 
+// Plan-usage samples, rate cache and per-day stats (usage skill).
+export const usageDir = (cfg) => expandHome(cfg?.usage?.dir || join(homeDir(), 'usage'));
+
 // ---------------------------------------------------------------- pending reminders
 // Written by `check --notify` (OS scheduler); injected once into the next Claude Code prompt by the hook.
 const pendingFile = () => join(homeDir(), 'pending.json');

@@ -57,8 +57,8 @@ Never capture: secrets, passwords, tokens, personal data of other people, anythi
 
 ## Review (consolidation)
 
-1. Read inbox + `DA today <date> --json` for each of the last `memory.review_days` days (do not read raw log files).
-2. Derive habit candidates from the log (median session start/end, typical hours per task, frequent commands/folders) — each with evidence count.
+1. Read inbox + `DA today <date> --json` for each of the last `memory.review_days` days, and `node ~/.daily-assistant/bin/usage.mjs commands --days=<review_days> --json` (do not read raw log files).
+2. Derive habit candidates from the log (median session start/end, typical hours per task, frequent commands/folders) — each with evidence count. A command head repeated across many days is knowledge (`knowledge/commands`), and a candidate for a script or checklist item.
 3. Merge duplicates; drop candidates already present or contradicted by a newer user correction.
 4. Show a table `id | candidate | target | evidence | action(add/update/drop)`. Candidates with `seen ≥ repeat_threshold` default to **add**, others to **keep in inbox**.
 5. Apply only the rows the user approves; write `--dry-run` = show only.

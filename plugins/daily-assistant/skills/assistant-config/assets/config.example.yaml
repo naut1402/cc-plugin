@@ -58,6 +58,43 @@ evolution:
   projects: []                              # repos whose rules / project skills are tracked; [] = projects with Claude memory
   language: ""                              # page labels: vi | en; "" = persona.language
 
+# ---------------------------------------------------------------- usage (tokens, plan %, command stats)
+# /usage: weighted tokens from Claude Code transcripts, calibrated against plan usage % sampled by the
+# status line wrapper ("/usage setup"), per task / per day, estimates from similar tasks, shell-command stats.
+usage:
+  enabled: true
+  dir: "~/.daily-assistant/usage"           # samples.jsonl, rate.json, days/<date>.json
+  handover_at: 85                           # 5-hour % that queues one /human-handover reminder per window; 0 = off
+  min_delta_pct: 3                          # min 5-hour % movement in a window to use it for calibration
+  rate_days: 30                             # days of samples used by "rate"
+  journal_section: "Usage"                  # heading of the day's block in the journal
+  # Phase samples (estimates per investigate / code / test …): regex for the markers agents write, with named
+  # groups phase, edge (start|end), optional time, agent. "" = [phase:<name>:start|end] with optional @HH:MM / @ISO.
+  phase_marker: ""
+  size_quantiles: [0.33, 0.67]              # S/M/L cut points within recorded samples of the same phase
+  weights:                                  # weight per token type (relative compute cost)
+    input: 1
+    output: 5
+    cache_write_5m: 1.25
+    cache_write_1h: 2
+    cache_read: 0.1
+  model_weights:                            # optional factor per model id substring, e.g. "sonnet: 0.6"; unset = 1
+  # Fallback weighted tokens per 1% when this machine cannot sample plan usage (long-lived token / CI):
+  # copy from "/usage rate" on a machine that samples, or sync this section with /sync-memory.
+  per_pct:
+    five_hour: 0
+    seven_day: 0
+
+# ---------------------------------------------------------------- human handover
+# /human-handover: runbook to run the daily routine by hand and handover notes for tasks in progress,
+# for when tokens run out. Local copies are always written; SilverBullet credentials come from the silverbullet plugin.
+handover:
+  dir: "~/.daily-assistant/handover"
+  silverbullet: true                        # false = local files only
+  runbook_page: "Agent/Runbook"
+  tasks_root: "Agent/Handover"              # -> <tasks_root>/<task id>
+  language: ""                              # "" = persona.language
+
 user:
   name: ""                      # display name, e.g. as shown on the logwork portal
   email: ""                     # git author email used to collect commits
@@ -169,6 +206,9 @@ watch:
     task_ids: true              # task IDs mentioned in prompts (IDs only)
     prompts: false              # also keep the first 120 chars of each prompt
     git: true                   # git commit/push/switch/merge, gh pr create/merge run inside Claude Code
+    bash: true                  # every Bash / PowerShell command Claude runs, verbatim (local log only; redacted
+                                # by the scripts wherever it is shown) — data for /usage commands and the runbook
+    bash_max_chars: 2000        # longer commands are cut
   # Marks expected every working day; a missing one is reminded at the next day's first session.
   # With report.slack.mode: draft (you send the draft yourself) use report-drafted instead of report-sent.
   required_marks: [report-sent, logwork-ok]

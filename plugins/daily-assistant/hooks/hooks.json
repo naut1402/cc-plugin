@@ -1,5 +1,5 @@
 {
-  "description": "daily-assistant watch: append session / task / git activity to ~/.daily-assistant/activity and remind about missed end-of-day items",
+  "description": "daily-assistant watch: append session / task / git / shell-command activity to ~/.daily-assistant/activity and remind about missed end-of-day items",
   "hooks": {
     "SessionStart": [
       {
@@ -17,7 +17,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           { "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/activity-log.mjs", "hook"], "timeout": 5 }
         ]

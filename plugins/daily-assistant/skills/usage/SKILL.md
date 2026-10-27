@@ -1,7 +1,7 @@
 ---
 name: usage
-description: Measures how much Claude the user's work consumes — weighted tokens from Claude Code transcripts calibrated against the plan usage % (5-hour and weekly limits, sampled through the status line), tokens and % per task and per day, estimates for a new task from similar past tasks, token budgets from a % of the limit (per task or per subagent) and spend per session / subagent — and the shell commands Claude ran, aggregated per day as data on the most used commands. Use when the user says /usage, "ước lượng token", "1% usage bằng bao nhiêu token", "task này tốn bao nhiêu token", "estimate công số", "còn bao nhiêu usage", "lệnh hay dùng", "thống kê lệnh", or during the end-of-day checklist.
-argument-hint: "[status|setup|rate|budget <pct> [--split=N]|spent|day [date]|task <ID...>|estimate <new-task> --like=<ID,...>|commands [date] [--days=N]|unsetup] [--dry-run]"
+description: Measures how much Claude the user's work consumes — weighted tokens from Claude Code transcripts calibrated against the plan usage % (5-hour and weekly limits, sampled through the status line), tokens and % per task and per day, estimates for a new task from similar past tasks (per phase such as investigate / code / test, with S/M/L size and time to finish under the plan limits), token budgets from a % of the limit (per task or per subagent) and spend per session / subagent — and the shell commands Claude ran, aggregated per day as data on the most used commands. Use when the user says /usage, "ước lượng token", "1% usage bằng bao nhiêu token", "task này tốn bao nhiêu token", "estimate công số", "còn bao nhiêu usage", "lệnh hay dùng", "thống kê lệnh", or during the end-of-day checklist.
+argument-hint: "[status|setup|rate|budget <pct> [--split=N]|spent|phase scan --task=<ID>|day [date]|task <ID...>|estimate <new-task> --like=<ID,...>|commands [date] [--days=N]|unsetup] [--dry-run]"
 user-invocable: true
 ---
 
@@ -23,6 +23,8 @@ Section `usage` (see `assistant-config`); defaults apply when it is absent. Gate
 | `model_weights` | Optional factor per model id substring (e.g. `sonnet: 0.6`); unset = 1 |
 | `min_delta_pct` | Minimum 5-hour % movement in a window to use it for calibration |
 | `rate_days` | Days of samples used by `rate` |
+| `phase_marker` | Regex for phase markers in agent messages (named groups `phase`, `edge`, optional `time`, `agent`); empty = `[phase:<name>:start\|end(@time)]` |
+| `size_quantiles` | Cut points of S/M/L within recorded samples (default `[0.33, 0.67]`) |
 | `per_pct.five_hour` / `per_pct.seven_day` | Fallback weighted tokens per 1% when this machine has no calibrated `rate.json` — copy the numbers from `US rate` on a machine that samples, or sync the `usage` config section with `/sync-memory` |
 
 ## How the numbers are made
@@ -53,17 +55,33 @@ Caveats to state when relevant: usage on other machines or claude.ai moves the %
 | `rate [--set=<5h>,<week>]` | `US rate` — recompute and cache tokens per 1%. Exit 2 → relay why (not enough samples) and, on a machine that never samples, offer `--set` with numbers from another machine |
 | `budget <pct> [--window=5h\|week] [--split=N]` | `US budget …` — see Budgets |
 | `spent [--since=HH:MM]` | `US spent --cwd=<current dir> --by-agent` — this session's main thread and each subagent in tokens and % |
+| `phase scan\|record\|list\|drop …` | See Phase samples |
 | `day [date]` | `US day [date]`; end-of-day → `US day --save` (also saves the day's command stats), then `US commands --md` and offer to write it into the journal (below) |
 | `task <ID...>` | `US task <ID...>` |
 | `estimate <new task> [--like=…]` | See below |
 | `commands [date] [--days=N] [--task=ID]` | `US commands …`; add a 2–3 line reading only if asked (e.g. candidates for a script or a permission allowlist) |
 
+## Phase samples
+
+Estimates by phase (investigate / design / code / test / review …) need one sample per phase of each finished task: the tokens and time the agent doing that phase spent between its reported start and end. The orchestrator (main session) records them; the script reads the transcripts, so the model never has to.
+
+| Way | Command |
+|-----|---------|
+| Markers — teammates write `[phase:<name>:start]` / `[phase:<name>:end]` (optional `@HH:MM` or `@<ISO>`) in a message or in their report to the orchestrator | after the task (or each phase): `US phase scan --task=<ID> [--sid=<session>]`. A marker relayed into the main thread counts once, for the teammate that wrote it. Other report formats: set `usage.phase_marker` (regex with named groups `phase`, `edge` = start\|end, optional `time`, `agent`) |
+| Times reported in prose — orchestrator reads them from the report | `US phase record --task=<ID> --phase=<name> --from=<HH:MM\|ISO> [--to=…] --agent=<id\|name\|agent type\|main>` |
+
+- A sample covers the responses of that agent in the range (all agents of the session when `--agent` is omitted, so pass it when teammates run in parallel). Time = active minutes (gaps between responses, each ≤ 5 min) and wall minutes.
+- Re-recording the same task + phase + agent replaces the sample; `US phase drop --task=<ID> [--phase=…]` removes wrong ones; `--dry-run` shows without saving.
+- Phase names are free text: keep one vocabulary per project (e.g. the pipeline step ids) so estimates can match them.
+
 ## Estimate a new task
 
-1. Reference tasks: `--like` given → use them. Otherwise pick 2–5 finished tasks of the same kind — from `learn recall estimate`, the tracker (`my-tasks` data: same type / size) or task memory — show the picks and let the user change them.
-2. `US estimate --like=<IDs>`; tasks with no data are listed — drop or replace them.
-3. Answer: median as the estimate, max as the upper bound, each as weighted tokens and % of the 5-hour and weekly limits, plus how many 5-hour windows that is (`% of 5h ÷ 100`). Mention that `rate` is missing when % shows `n/a`.
-4. Offer `learn capture` of the result as knowledge (`estimate: <task type> ≈ N% of 5h`) once the user confirms the numbers are useful.
+1. Reference tasks of similar difficulty: `--like` given → use them. Otherwise pick 2–5 finished tasks of the same kind — from `learn recall estimate`, the tracker (`my-tasks` data: same type / size) or task memory — show the picks and let the user change them.
+2. `US estimate --like=<IDs>`. Tasks with no data are listed — drop or replace them.
+3. With phase samples the script prints, per phase in the usual order: median weighted tokens (max as upper bound), % of the 5-hour and weekly limits, **size S/M/L** relative to all recorded samples of that phase (cut points `usage.size_quantiles`, default the 33rd / 67th percentile; `?` until 3 tasks exist), active time; then the total with size, number of 5-hour windows, and **time with limits** — active time plus waiting for resets, simulated from the current 5-hour % and its reset time, with a warning when the work exceeds what is left of the weekly limit.
+4. Without phase samples: totals only (median / mean / max as tokens and %).
+5. Answer with size and time per phase plus the total, and the limit context in one line (`= 1.6 × 5h window, needs one reset wait`). Mention that `rate` is missing when % shows `n/a`.
+6. Offer `learn capture` of the result as knowledge (`estimate: <task type> ≈ N% of 5h`) once the user confirms the numbers are useful.
 
 ## Budgets
 

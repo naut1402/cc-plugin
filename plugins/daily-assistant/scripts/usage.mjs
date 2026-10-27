@@ -18,8 +18,12 @@ const USAGE = `Usage: node usage.mjs <command> [options]
   rate --set=<5h>[,<week>]            set the rate by hand (machines without plan samples, e.g. long-lived token)
   budget <pct> [--window=5h|week] [--split=N] [--json]   % of a limit → token budget (split across N agents)
   spent [--sid=S|--cwd=DIR] [--since=HH:MM] [--by-agent] [--json]   session spend, main thread + each subagent, in %
+  phase record --task=ID --phase=P --from=T [--to=T] [--agent=A] [--sid=S]   save one phase sample (T = HH:MM | ISO)
+  phase scan --task=ID [--sid=S] [--dry-run]   save samples from [phase:<name>:start|end] markers the agents wrote
+  phase list [--task=ID] | drop --task=ID [--phase=P]
   task <ID...> [--days=N] [--json]    tokens and % per task (saved days + transcripts still on disk)
-  estimate --like=<ID,ID> [--json]    estimate a new task from similar past tasks
+  estimate --like=<ID,ID> [--json]    estimate a new task from similar past tasks: per phase with S/M/L and the
+                                      time to finish under the plan limits when phase samples exist, else totals
   commands [DATE] [--days=N] [--task=ID] [--sid=S] [--top=N] [--md] [--json]
                                       shell commands run by Claude (activity log), grouped by command head
   facts [--cwd=DIR] [--sid=S] [--task=ID]   handover facts: session, git state, usage, recent commands, open todo
@@ -451,10 +455,195 @@ async function task() {
   }
 }
 
+// ---------------------------------------------------------------- phases
+// A phase sample = tokens and time one agent spent on one phase of a task (investigate / code / test …), cut by the
+// start/end times its agent reported. Samples feed per-phase estimates, S/M/L sizing and the time simulation.
+const PHASES = join(DIR, 'phases.jsonl');
+const MARKER = new RegExp(u.phase_marker || String.raw`\[phase:(?<phase>[\w-]+):(?<edge>start|end)(?:@(?<time>[\dT:.+Z-]+))?\]`, 'g');
+const metaCache = new Map();
+const agentMeta = (file) => { if (!file) return null; if (!metaCache.has(file)) metaCache.set(file, readJson(file.replace(/\.jsonl$/, '.meta.json'))); return metaCache.get(file); };
+const agentMatches = (r, a) => {
+  if (!a) return true;
+  if (a === 'main') return !r.agent;
+  const m = agentMeta(r.file) || {};
+  return [r.agent, m.name, m.agentType, m.spawnedAgentType].some((v) => v && String(v).toLowerCase().includes(a.toLowerCase()));
+};
+// Time the agent actually worked: gaps between its responses, each capped at 5 minutes.
+const activeMin = (rs) => Math.round(rs.reduce((a, r, i) => a + (i ? Math.min(r.ms - rs[i - 1].ms, 300e3) : 60e3), 0) / 60000);
+const parseTime = (s) => (/^\d{1,2}:\d{2}$/.test(s) ? new Date(`${now.date}T${s.padStart(5, '0')}:00`).getTime() : Date.parse(s));
+
+function readPhases() {
+  try { return readFileSync(PHASES, 'utf8').split('\n').filter(Boolean).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } }); } catch { return []; }
+}
+
+function savePhases(samples) {
+  const key = (p) => `${p.task}|${p.phase}|${p.sid}|${p.agent}`;
+  const fresh = new Set(samples.map(key));
+  const kept = readPhases().filter((p) => !fresh.has(key(p)));
+  mkdirSync(DIR, { recursive: true });
+  writeFileSync(PHASES, [...kept, ...samples].map((p) => JSON.stringify(p)).join('\n') + '\n');
+}
+
+function phaseSample({ task, phase, sid, agent, from, to, src, open }) {
+  const rate = cachedRate();
+  const rs = scan(from - 60e3, to, { sid }).filter((r) => r.sid === sid && r.ms >= from && agentMatches(r, agent));
+  const t = sum(rs);
+  const meta = agentMeta(rs.find((r) => r.file)?.file);
+  return {
+    t: new Date().toISOString(), task: task.toUpperCase(), phase: phase.toLowerCase(), sid, agent: agent || 'all', name: meta?.name || meta?.agentType || '',
+    from: new Date(from).toISOString(), to: new Date(to).toISOString(), minutes: Math.round((to - from) / 60000), active: activeMin(rs),
+    w: Math.round(t.w), raw: raw(t), msgs: t.msgs, pct5: pct(t.w, rate, 'five_hour'), pctWeek: pct(t.w, rate, 'seven_day'), src, ...(open ? { open: true } : {}),
+  };
+}
+
+// Phase markers the agents wrote in their own messages (text or the input of a message to the orchestrator).
+function findMarkers(sid) {
+  const found = new Map();
+  const files = transcriptFiles(Date.now() - 30 * 864e5).filter((f) => f.includes(sid));
+  // Subagent transcripts first: a marker relayed to the main thread then counts once, for the agent that wrote it.
+  files.sort((a, b) => Number(b.includes('subagents')) - Number(a.includes('subagents')));
+  for (const f of files) {
+    let text;
+    try { text = readFileSync(f, 'utf8'); } catch { continue; }
+    for (const line of text.split('\n')) {
+      if (!line.includes('"assistant"') || !MARKER.test(line)) continue;
+      MARKER.lastIndex = 0;
+      let x;
+      try { x = JSON.parse(line); } catch { continue; }
+      if (x.type !== 'assistant' || x.sessionId !== sid) continue;
+      for (const m of line.matchAll(MARKER)) {
+        const g = m.groups || {};
+        const agent = g.agent || (x.agentId ? x.agentId : 'main');
+        const k = `${String(g.phase).toLowerCase()}|${agent}`;
+        if ([...found.values()].some((v) => v.phase === String(g.phase).toLowerCase() && v.agent !== agent && v.agent !== 'main' && agent === 'main')) continue;
+        const at = g.time ? parseTime(g.time) : Date.parse(x.timestamp);
+        const v = found.get(k) || { phase: String(g.phase).toLowerCase(), agent };
+        if (g.edge === 'start') v.from = Math.min(v.from ?? at, at); else v.to = Math.max(v.to ?? at, at);
+        found.set(k, v);
+      }
+    }
+  }
+  return [...found.values()];
+}
+
+async function phaseCmd() {
+  const [sub = 'list'] = args;
+  if (sub === 'list') {
+    const ps = readPhases().filter((p) => !flags.task || p.task === String(flags.task).toUpperCase());
+    if (flags.json) { out(JSON.stringify(ps)); return; }
+    if (!ps.length) { out('no phase samples'); return; }
+    for (const p of ps) out(`${p.task.padEnd(10)} ${p.phase.padEnd(12)} ${fmtK(p.w).padStart(7)} · ${p.pct5 ?? '?'}% 5h · active ${p.active}m / wall ${p.minutes}m · ${p.name || p.agent}${p.open ? ' (open)' : ''}`);
+    return;
+  }
+  if (!flags.task) die('usage: phase record|scan|drop --task=<ID> …', 2);
+  if (sub === 'drop') {
+    const keep = readPhases().filter((p) => !(p.task === String(flags.task).toUpperCase() && (!flags.phase || p.phase === String(flags.phase).toLowerCase())));
+    mkdirSync(DIR, { recursive: true });
+    writeFileSync(PHASES, keep.map((p) => JSON.stringify(p)).join('\n') + (keep.length ? '\n' : ''));
+    out(`dropped samples of ${String(flags.task).toUpperCase()}${flags.phase ? ` / ${flags.phase}` : ''}`);
+    return;
+  }
+  const { sid } = currentSession();
+  if (!sid) { out('no session found — pass --sid=<session id> or --cwd=<folder of the session>'); return 2; }
+  let samples = [];
+  if (sub === 'record') {
+    const from = parseTime(String(flags.from || '')), to = flags.to ? parseTime(String(flags.to)) : Date.now();
+    if (!flags.phase || !Number.isFinite(from) || !Number.isFinite(to) || to <= from) die('usage: phase record --task=<ID> --phase=<name> --from=<HH:MM|ISO> [--to=<HH:MM|ISO>] [--agent=<id|name|main>] [--sid=S]', 2);
+    samples = [phaseSample({ task: flags.task, phase: flags.phase, sid, agent: flags.agent, from, to, src: 'range' })];
+  } else if (sub === 'scan') {
+    const ms = findMarkers(sid);
+    if (!ms.length) { out(`no phase markers in session ${sid} (pattern ${MARKER.source})`); return 2; }
+    for (const m of ms) {
+      if (m.from === undefined) { out(`skip ${m.phase} (${m.agent}): end without start`); continue; }
+      samples.push(phaseSample({ task: flags.task, phase: m.phase, sid, agent: m.agent, from: m.from, to: m.to ?? Date.now(), src: 'marker', open: m.to === undefined }));
+    }
+  } else die('usage: phase list|record|scan|drop …', 2);
+  if (!flags['dry-run']) savePhases(samples);
+  if (flags.json) { out(JSON.stringify(samples)); return; }
+  for (const p of samples) out(`${flags['dry-run'] ? 'would record' : 'recorded'} ${p.task} ${p.phase} (${p.name || p.agent}): ${fmtK(p.w)} weighted · ${p.pct5 ?? '?'}% 5h · active ${p.active}m / wall ${p.minutes}m${p.open ? ' · still open' : ''}`);
+}
+
+// Sizes are relative to past work: S/M/L = below / between / above the usage.size_quantiles of recorded samples.
+function sizer(values) {
+  if (values.length < 3) return () => null;
+  const s = [...values].sort((a, b) => a - b);
+  const q = (p) => { const i = p * (s.length - 1), lo = Math.floor(i); return s[lo] + (s[Math.ceil(i)] - s[lo]) * (i - lo); };
+  const [a, b] = (Array.isArray(u.size_quantiles) ? u.size_quantiles : [0.33, 0.67]).map(Number).map(q);
+  return (v) => (v <= a ? 'S' : v <= b ? 'M' : 'L');
+}
+
+// Walks the phases through the 5-hour windows from the current plan usage: when a window fills, wait for its reset.
+function simulate(steps, rate) {
+  const per5 = rate?.five_hour?.perPct;
+  if (!per5) return null;
+  const s = samples().at(-1);
+  const H5 = 5 * 3600e3, cap = 100 * per5;
+  let t = Date.now(), wait = 0;
+  let winEnd = s?.r5 && s.r5 * 1000 > t ? s.r5 * 1000 : null;
+  let used = winEnd ? (s.p5 || 0) * per5 : 0;
+  const res = [];
+  for (const st of steps) {
+    let need = st.w;
+    const speed = st.w / Math.max(60e3, st.active * 60e3);
+    const start = t;
+    for (let guard = 0; need > 1 && guard < 500; guard++) {
+      if (winEnd && t >= winEnd) { winEnd = null; used = 0; }
+      if (!winEnd) winEnd = t + H5;
+      const room = cap - used;
+      if (room <= 1) { wait += winEnd - t; t = winEnd; continue; }
+      const take = Math.min(need, room, speed * (winEnd - t));
+      t += take / speed; used += take; need -= take;
+    }
+    res.push({ phase: st.phase, start, end: t });
+  }
+  const total = steps.reduce((a, x) => a + x.w, 0);
+  const weekLeft = rate.seven_day?.perPct && s?.p7 !== undefined ? (100 - s.p7) * rate.seven_day.perPct : null;
+  return { end: t, wait, steps: res, overWeek: weekLeft !== null && total > weekLeft, weekReset: s?.r7 ? s.r7 * 1000 : null, p5: s?.p5, p7: s?.p7, r5: s?.r5 };
+}
+
+function phaseEstimate(like, rate) {
+  const all = readPhases().filter((p) => !p.open);
+  const byTaskPhase = new Map();
+  for (const p of all) { const k = `${p.task}|${p.phase}`; const v = byTaskPhase.get(k) || { task: p.task, phase: p.phase, w: 0, active: 0, first: p.from }; v.w += p.w; v.active += p.active; if (p.from < v.first) v.first = p.from; byTaskPhase.set(k, v); }
+  const rows = [...byTaskPhase.values()];
+  const refs = rows.filter((r) => like.includes(r.task));
+  if (!refs.length) return null;
+  // Phase order = typical start order in the reference tasks.
+  const order = [...new Set(refs.sort((a, b) => a.first.localeCompare(b.first)).map((r) => r.phase))];
+  const phases = order.map((ph) => {
+    const rs = refs.filter((r) => r.phase === ph);
+    const w = Math.round(median(rs.map((r) => r.w))), active = Math.round(median(rs.map((r) => r.active)));
+    return { phase: ph, w, max: Math.max(...rs.map((r) => r.w)), active, n: rs.length, size: sizer(rows.filter((r) => r.phase === ph).map((r) => r.w))(w), pct5: pct(w, rate, 'five_hour'), pctWeek: pct(w, rate, 'seven_day') };
+  });
+  const totals = new Map();
+  for (const r of rows) totals.set(r.task, (totals.get(r.task) || 0) + r.w);
+  const w = phases.reduce((a, p) => a + p.w, 0), active = phases.reduce((a, p) => a + p.active, 0);
+  return { refs: [...new Set(refs.map((r) => r.task))], phases, total: { w, active, size: sizer([...totals.values()])(w), pct5: pct(w, rate, 'five_hour'), pctWeek: pct(w, rate, 'seven_day'), windows5: pct(w, rate, 'five_hour') !== null ? Math.round((pct(w, rate, 'five_hour') / 100) * 100) / 100 : null, history: totals.size }, time: simulate(phases, rate) };
+}
+
+const fmtDur = (min) => `${Math.floor(min / 60)}h${String(Math.round(min % 60)).padStart(2, '0')}`;
+
 async function estimate() {
-  const like = String(flags.like || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const like = String(flags.like || '').split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
   if (!like.length) die('usage: estimate --like=<ID,ID,...>  (similar finished tasks)', 2);
   const rate = cachedRate();
+  const pe = phaseEstimate(like, rate);
+  if (pe) {
+    if (flags.json) { out(JSON.stringify(pe)); return; }
+    out(`by phase, from ${pe.refs.length} similar task(s) with phase samples: ${pe.refs.join(', ')}${like.filter((x) => !pe.refs.includes(x)).length ? ` (no phase data: ${like.filter((x) => !pe.refs.includes(x)).join(', ')})` : ''}`);
+    for (const p of pe.phases) out(`  ${p.phase.padEnd(12)} ${fmtK(p.w).padStart(7)} (max ${fmtK(p.max)}) · ${pctStr(p.w, rate)} · size ${p.size || '?'} · active ≈${fmtDur(p.active)}`);
+    const t = pe.total;
+    out(`  ${'total'.padEnd(12)} ${fmtK(t.w).padStart(7)} · ${pctStr(t.w, rate)}${t.windows5 !== null ? ` = ${t.windows5} × 5h window` : ''} · size ${t.size || `? (need ≥3 tasks, have ${t.history})`} · active ≈${fmtDur(t.active)}`);
+    const sim = pe.time;
+    if (!sim) out('time with limits: n/a (no rate — run `rate`)');
+    else {
+      out(`now: 5h ${sim.p5 ?? '?'}%${sim.r5 ? ` (resets ${localTime(sim.r5 * 1000).slice(11, 16)})` : ''} · week ${sim.p7 ?? '?'}%`);
+      out(`time with limits ≈ ${fmtDur((sim.end - Date.now()) / 60000)} (active ${fmtDur(t.active)} + waiting for resets ${fmtDur(sim.wait / 60000)}) → done ≈ ${localTime(sim.end).slice(5, 16).replace('T', ' ')} if started now`);
+      for (const st of sim.steps) out(`  ${st.phase.padEnd(12)} ${localTime(st.start).slice(5, 16).replace('T', ' ')} → ${localTime(st.end).slice(5, 16).replace('T', ' ')}`);
+      if (sim.overWeek) out(`⚠ more than what is left of the weekly limit${sim.weekReset ? ` — the rest waits for the weekly reset ${localTime(sim.weekReset).slice(5, 16).replace('T', ' ')}` : ''}`);
+    }
+    return;
+  }
   const h = taskHistory(like, Number(flags.days) || 120);
   const used = Object.entries(h).filter(([, v]) => v.msgs);
   if (!used.length) { out('none of these tasks has recorded usage'); return 2; }
@@ -635,6 +824,6 @@ async function unsetup() {
   out('restored');
 }
 
-const COMMANDS = { status, day, rate: rateCmd, budget, spent, task, estimate, commands, facts, setup, unsetup };
+const COMMANDS = { status, day, rate: rateCmd, budget, spent, phase: phaseCmd, task, estimate, commands, facts, setup, unsetup };
 if (!COMMANDS[cmd]) die(USAGE, cmd ? 1 : 0);
 process.exitCode = (await COMMANDS[cmd]()) || 0;

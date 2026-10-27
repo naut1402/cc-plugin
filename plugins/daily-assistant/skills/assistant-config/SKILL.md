@@ -68,7 +68,7 @@ Deterministic work runs in Node scripts, not in the model. The SessionStart hook
 | `DA schedule show\|install\|remove` | OS-level schedule for checks (no Claude session needed) |
 | `node ~/.daily-assistant/bin/memory-sync.mjs status\|plan\|apply\|commit` | Three-way compare / merge of memory, persona and config sections with the sync hub (`sync-memory`) |
 | `node ~/.daily-assistant/bin/evolution.mjs scan\|diff\|snapshot\|page` | Inventory of capabilities and learned memory, diff against the last snapshot, profile page render / push (`evolution`) |
-| `node ~/.daily-assistant/bin/usage.mjs status\|day\|rate\|budget\|spent\|task\|estimate\|commands\|facts\|setup` | Reading transcripts for tokens, calibrating tokens per 1% of plan usage, % ↔ token budgets, per-session / per-subagent spend, per-task history, shell-command stats, handover facts (`usage`, `human-handover`) |
+| `node ~/.daily-assistant/bin/usage.mjs status\|day\|rate\|budget\|spent\|phase\|task\|estimate\|commands\|facts\|setup` | Reading transcripts for tokens, calibrating tokens per 1% of plan usage, % ↔ token budgets, per-session / per-subagent spend, per-phase samples, per-task history and estimates (S/M/L, time under the limits), shell-command stats, handover facts (`usage`, `human-handover`) |
 | `~/.daily-assistant/bin/statusline.mjs` (status line, not called by skills) | Sampling plan usage % on every status line refresh; queues the `usage-handover` reminder |
 
 Rules:

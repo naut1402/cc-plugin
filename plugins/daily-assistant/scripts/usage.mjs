@@ -20,9 +20,11 @@ const USAGE = `Usage: node usage.mjs <command> [options]
   spent [--sid=S|--cwd=DIR] [--since=HH:MM] [--by-agent] [--json]   session spend, main thread + each subagent, in %
   phase record --task=ID --phase=P --from=T [--to=T] [--agent=A] [--sid=S]   save one phase sample (T = HH:MM | ISO)
   phase scan --task=ID [--sid=S] [--dry-run]   save samples from [phase:<name>:start|end] markers the agents wrote
-  phase list [--task=ID] | drop --task=ID [--phase=P]
+  phase list [--task=ID] [--project=P] | drop --task=ID [--phase=P]
+                                      (record/scan take --project=P; default: git repo of the session folder)
   task <ID...> [--days=N] [--json]    tokens and % per task (saved days + transcripts still on disk)
-  estimate --like=<ID,ID> [--json]    estimate a new task from similar past tasks: per phase with S/M/L and the
+  estimate --like=<ID,ID> [--project=P|--all-projects] [--json]
+                                      estimate a new task from similar past tasks: per phase with S/M/L and the
                                       time to finish under the plan limits when phase samples exist, else totals
   commands [DATE] [--days=N] [--task=ID] [--sid=S] [--top=N] [--md] [--json]
                                       shell commands run by Claude (activity log), grouped by command head
@@ -105,7 +107,7 @@ function scan(fromMs, toMs = Date.now(), { sid } = {}) {
       const cw = us.cache_creation_input_tokens || 0;
       const cw1h = us.cache_creation?.ephemeral_1h_input_tokens || 0;
       const r = {
-        ms, sid: x.sessionId, model: m.model || '?', sub: !!x.isSidechain, agent: x.agentId, file: x.agentId ? f : undefined,
+        ms, sid: x.sessionId, model: m.model || '?', sub: !!x.isSidechain, agent: x.agentId, file: x.agentId ? f : undefined, cwd: x.cwd,
         in: us.input_tokens || 0, out: us.output_tokens || 0, cw5: cw - cw1h, cw1h, cr: us.cache_read_input_tokens || 0,
       };
       r.w = (r.in * W.input + r.out * W.output + r.cw5 * W.cache_write_5m + r.cw1h * W.cache_write_1h + r.cr * W.cache_read) * modelWeight(r.model);
@@ -484,13 +486,25 @@ function savePhases(samples) {
   writeFileSync(PHASES, [...kept, ...samples].map((p) => JSON.stringify(p)).join('\n') + '\n');
 }
 
-function phaseSample({ task, phase, sid, agent, from, to, src, open }) {
+// Project = the git repository of a folder (the main repo for a worktree), else the folder name.
+const projectCache = new Map();
+function projectOf(cwd) {
+  if (!cwd) return '';
+  if (!projectCache.has(cwd)) {
+    const common = git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir'], 2000);
+    projectCache.set(cwd, basename(common ? dirname(resolve(common)) : resolve(cwd)));
+  }
+  return projectCache.get(cwd);
+}
+
+function phaseSample({ task, phase, sid, agent, from, to, src, open, project }) {
   const rate = cachedRate();
   const rs = scan(from - 60e3, to, { sid }).filter((r) => r.sid === sid && r.ms >= from && agentMatches(r, agent));
   const t = sum(rs);
   const meta = agentMeta(rs.find((r) => r.file)?.file);
   return {
-    t: new Date().toISOString(), task: task.toUpperCase(), phase: phase.toLowerCase(), sid, agent: agent || 'all', name: meta?.name || meta?.agentType || '',
+    t: new Date().toISOString(), task: task.toUpperCase(), project: project || projectOf(rs.find((r) => r.cwd)?.cwd),
+    phase: phase.toLowerCase(), sid, agent: agent || 'all', name: meta?.name || meta?.agentType || '',
     from: new Date(from).toISOString(), to: new Date(to).toISOString(), minutes: Math.round((to - from) / 60000), active: activeMin(rs),
     w: Math.round(t.w), raw: raw(t), msgs: t.msgs, pct5: pct(t.w, rate, 'five_hour'), pctWeek: pct(t.w, rate, 'seven_day'), src, ...(open ? { open: true } : {}),
   };
@@ -529,10 +543,10 @@ function findMarkers(sid) {
 async function phaseCmd() {
   const [sub = 'list'] = args;
   if (sub === 'list') {
-    const ps = readPhases().filter((p) => !flags.task || p.task === String(flags.task).toUpperCase());
+    const ps = readPhases().filter((p) => (!flags.task || p.task === String(flags.task).toUpperCase()) && (!flags.project || p.project === flags.project));
     if (flags.json) { out(JSON.stringify(ps)); return; }
     if (!ps.length) { out('no phase samples'); return; }
-    for (const p of ps) out(`${p.task.padEnd(10)} ${p.phase.padEnd(12)} ${fmtK(p.w).padStart(7)} · ${p.pct5 ?? '?'}% 5h · active ${p.active}m / wall ${p.minutes}m · ${p.name || p.agent}${p.open ? ' (open)' : ''}`);
+    for (const p of ps) out(`${(p.project || '?').padEnd(16)} ${p.task.padEnd(10)} ${p.phase.padEnd(12)} ${fmtK(p.w).padStart(7)} · ${p.pct5 ?? '?'}% 5h · active ${p.active}m / wall ${p.minutes}m · ${p.name || p.agent}${p.open ? ' (open)' : ''}`);
     return;
   }
   if (!flags.task) die('usage: phase record|scan|drop --task=<ID> …', 2);
@@ -543,19 +557,20 @@ async function phaseCmd() {
     out(`dropped samples of ${String(flags.task).toUpperCase()}${flags.phase ? ` / ${flags.phase}` : ''}`);
     return;
   }
-  const { sid } = currentSession();
+  const { sid, start } = currentSession();
   if (!sid) { out('no session found — pass --sid=<session id> or --cwd=<folder of the session>'); return 2; }
+  const project = flags.project ? String(flags.project) : projectOf(start?.cwd);
   let samples = [];
   if (sub === 'record') {
     const from = parseTime(String(flags.from || '')), to = flags.to ? parseTime(String(flags.to)) : Date.now();
     if (!flags.phase || !Number.isFinite(from) || !Number.isFinite(to) || to <= from) die('usage: phase record --task=<ID> --phase=<name> --from=<HH:MM|ISO> [--to=<HH:MM|ISO>] [--agent=<id|name|main>] [--sid=S]', 2);
-    samples = [phaseSample({ task: flags.task, phase: flags.phase, sid, agent: flags.agent, from, to, src: 'range' })];
+    samples = [phaseSample({ task: flags.task, phase: flags.phase, sid, agent: flags.agent, from, to, src: 'range', project })];
   } else if (sub === 'scan') {
     const ms = findMarkers(sid);
     if (!ms.length) { out(`no phase markers in session ${sid} (pattern ${MARKER.source})`); return 2; }
     for (const m of ms) {
       if (m.from === undefined) { out(`skip ${m.phase} (${m.agent}): end without start`); continue; }
-      samples.push(phaseSample({ task: flags.task, phase: m.phase, sid, agent: m.agent, from: m.from, to: m.to ?? Date.now(), src: 'marker', open: m.to === undefined }));
+      samples.push(phaseSample({ task: flags.task, phase: m.phase, sid, agent: m.agent, from: m.from, to: m.to ?? Date.now(), src: 'marker', open: m.to === undefined, project }));
     }
   } else die('usage: phase list|record|scan|drop …', 2);
   if (!flags['dry-run']) savePhases(samples);
@@ -604,10 +619,20 @@ function simulate(steps, rate) {
 function phaseEstimate(like, rate) {
   const all = readPhases().filter((p) => !p.open);
   const byTaskPhase = new Map();
-  for (const p of all) { const k = `${p.task}|${p.phase}`; const v = byTaskPhase.get(k) || { task: p.task, phase: p.phase, w: 0, active: 0, first: p.from }; v.w += p.w; v.active += p.active; if (p.from < v.first) v.first = p.from; byTaskPhase.set(k, v); }
-  const rows = [...byTaskPhase.values()];
-  const refs = rows.filter((r) => like.includes(r.task));
+  for (const p of all) { const k = `${p.task}|${p.phase}`; const v = byTaskPhase.get(k) || { task: p.task, project: p.project || '', phase: p.phase, w: 0, active: 0, first: p.from }; v.w += p.w; v.active += p.active; if (p.from < v.first) v.first = p.from; byTaskPhase.set(k, v); }
+  const refs = [...byTaskPhase.values()].filter((r) => like.includes(r.task));
   if (!refs.length) return null;
+  // Baseline for S/M/L = samples of one project: --project, else the current folder's project when a reference task
+  // belongs to it, else the project most reference tasks belong to. --all-projects compares across projects.
+  let project = null;
+  if (!flags['all-projects']) {
+    const counts = new Map();
+    for (const t of new Set(refs.map((r) => `${r.project}|${r.task}`))) { const p = t.split('|')[0]; counts.set(p, (counts.get(p) || 0) + 1); }
+    const here = projectOf(resolve(expandHome(flags.cwd || process.cwd())));
+    project = flags.project ? String(flags.project) : counts.has(here) ? here : [...counts].sort((a, b) => b[1] - a[1])[0][0];
+  }
+  const rows = [...byTaskPhase.values()].filter((r) => project === null || r.project === project);
+  const otherRefs = [...new Set(refs.filter((r) => project !== null && r.project !== project).map((r) => `${r.task} (${r.project || '?'})`))];
   // Phase order = typical start order in the reference tasks.
   const order = [...new Set(refs.sort((a, b) => a.first.localeCompare(b.first)).map((r) => r.phase))];
   const phases = order.map((ph) => {
@@ -618,7 +643,7 @@ function phaseEstimate(like, rate) {
   const totals = new Map();
   for (const r of rows) totals.set(r.task, (totals.get(r.task) || 0) + r.w);
   const w = phases.reduce((a, p) => a + p.w, 0), active = phases.reduce((a, p) => a + p.active, 0);
-  return { refs: [...new Set(refs.map((r) => r.task))], phases, total: { w, active, size: sizer([...totals.values()])(w), pct5: pct(w, rate, 'five_hour'), pctWeek: pct(w, rate, 'seven_day'), windows5: pct(w, rate, 'five_hour') !== null ? Math.round((pct(w, rate, 'five_hour') / 100) * 100) / 100 : null, history: totals.size }, time: simulate(phases, rate) };
+  return { project, baselineTasks: totals.size, otherRefs, refs: [...new Set(refs.map((r) => r.task))], phases, total: { w, active, size: sizer([...totals.values()])(w), pct5: pct(w, rate, 'five_hour'), pctWeek: pct(w, rate, 'seven_day'), windows5: pct(w, rate, 'five_hour') !== null ? Math.round((pct(w, rate, 'five_hour') / 100) * 100) / 100 : null, history: totals.size }, time: simulate(phases, rate) };
 }
 
 const fmtDur = (min) => `${Math.floor(min / 60)}h${String(Math.round(min % 60)).padStart(2, '0')}`;
@@ -631,9 +656,10 @@ async function estimate() {
   if (pe) {
     if (flags.json) { out(JSON.stringify(pe)); return; }
     out(`by phase, from ${pe.refs.length} similar task(s) with phase samples: ${pe.refs.join(', ')}${like.filter((x) => !pe.refs.includes(x)).length ? ` (no phase data: ${like.filter((x) => !pe.refs.includes(x)).join(', ')})` : ''}`);
+    out(`S/M/L baseline: ${pe.project === null ? 'all projects' : `project ${pe.project || '(unknown)'}`} · ${pe.baselineTasks} task(s) with samples${pe.otherRefs.length ? ` · references from other projects: ${pe.otherRefs.join(', ')}` : ''}`);
     for (const p of pe.phases) out(`  ${p.phase.padEnd(12)} ${fmtK(p.w).padStart(7)} (max ${fmtK(p.max)}) · ${pctStr(p.w, rate)} · size ${p.size || '?'} · active ≈${fmtDur(p.active)}`);
     const t = pe.total;
-    out(`  ${'total'.padEnd(12)} ${fmtK(t.w).padStart(7)} · ${pctStr(t.w, rate)}${t.windows5 !== null ? ` = ${t.windows5} × 5h window` : ''} · size ${t.size || `? (need ≥3 tasks, have ${t.history})`} · active ≈${fmtDur(t.active)}`);
+    out(`  ${'total'.padEnd(12)} ${fmtK(t.w).padStart(7)} · ${pctStr(t.w, rate)}${t.windows5 !== null ? ` = ${t.windows5} × 5h window` : ''} · size ${t.size || `? (baseline needs ≥3 tasks, has ${t.history}${pe.project !== null ? '; --all-projects compares across projects' : ''})`} · active ≈${fmtDur(t.active)}`);
     const sim = pe.time;
     if (!sim) out('time with limits: n/a (no rate — run `rate`)');
     else {

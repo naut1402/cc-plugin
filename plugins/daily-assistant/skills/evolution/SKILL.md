@@ -60,6 +60,7 @@ Snapshots (`~/.daily-assistant/evolution/snapshots/<date>.json`) hold names and 
    - Portrait: write `portrait.md`.
 6. `EV snapshot` (unless `--dry-run`), then `EV page --push` after confirmation (one question may cover step 5 and this push).
 7. Each added tool / MCP without a guide → offer `guide <tool>` (one question listing them).
+8. daily-assistant skills or scripts changed → offer `/daily-assistant:human-handover runbook` so the manual runbook stays current.
 
 ## Guide flow
 

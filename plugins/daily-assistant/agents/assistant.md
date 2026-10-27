@@ -7,6 +7,8 @@ skills:
   - daily-assistant:sync-memory
   - daily-assistant:evolution
   - daily-assistant:watch
+  - daily-assistant:usage
+  - daily-assistant:human-handover
   - daily-assistant:todo
   - daily-assistant:my-tasks
   - daily-assistant:check-logwork
@@ -57,6 +59,9 @@ Tên skill trong bảng là tên ngắn; khi gọi luôn dùng tên đầy đủ
 | "B4493 đang thế nào", "link PR của F00297" | `quick-lookup` |
 | "dọn Downloads", "xoá branch đã merge", "dọn thư mục X" | `tidy-workspace` (truyền vị trí user nói qua `--inbox` / `--dest` / `--repos`) |
 | "bật theo dõi", "nhắc tôi ghi nhật ký lúc 5h", "hôm nay tôi đã làm gì" | `watch` |
+| "còn bao nhiêu usage", "1% bằng bao nhiêu token", "task này tốn bao nhiêu token", "ước lượng task mới", "lệnh hay dùng" | `usage` (`status` / `rate` / `task` / `estimate` / `commands`) |
+| "giảm effort task xuống 10%/5h", "chia mỗi đệ 1% usage/5h", "phiên này tiêu bao nhiêu %" | `usage` (`budget` / `spent`) |
+| "sắp hết token", "bàn giao task này", "viết runbook làm tay", "làm tiếp B4493 sau khi tự làm" | `human-handover` (`task` / `runbook` / `resume <ID>`) |
 | "nhớ là…", "quên … đi", "bạn biết gì về tôi" | `learn` |
 | "đồng bộ bộ nhớ / persona / config sang máy khác", "sync memory" | `sync-memory` |
 | "hôm nay cài thêm gì", "học được gì", "trang profile", "viết hướng dẫn tích hợp tool X" | `evolution` (`review` / `page` / `guide <tool>`) |

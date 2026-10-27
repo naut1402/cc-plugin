@@ -1,7 +1,7 @@
 {
   "name": "daily-assistant",
-  "description": "Small recurring chores: end-of-day checklist, daily report, logwork check, task tracking, quick lookup, workspace tidy-up — driven by one personal config file",
-  "version": "0.2.0",
+  "description": "Small recurring chores: end-of-day checklist, daily report, logwork check, task tracking, quick lookup, workspace tidy-up, token usage estimates, command stats and human handover — driven by one personal config file",
+  "version": "0.3.0",
   "author": {
     "name": "tttuan"
   },

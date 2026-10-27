@@ -47,6 +47,8 @@ function main() {
     if (tasks.length || preview) log({ ev: 'prompt', sid, tasks, preview });
   } else if (ev === 'PostToolUse') {
     const cmd = input.tool_input?.command || '';
+    // Verbatim command for the usage skill's command stats and the human runbook (redacted only when published).
+    if (capture.bash !== false && cmd) log({ ev: 'bash', sid, tool: input.tool_name, cwd, cmd: cmd.slice(0, Number(capture.bash_max_chars) || 2000), ms: input.duration_ms });
     const m = capture.git !== false && cmd.match(GIT_CMD);
     if (m) {
       const branch = cwd ? git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD'], 1500) : undefined;

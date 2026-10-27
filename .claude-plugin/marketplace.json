@@ -49,7 +49,7 @@
     },
     {
       "name": "daily-assistant",
-      "description": "Small recurring chores: end-of-day checklist, daily report, logwork, task tracking, quick lookup, workspace tidy-up",
+      "description": "Small recurring chores: end-of-day checklist, daily report, logwork, task tracking, quick lookup, workspace tidy-up, token usage estimates, command stats, human handover",
       "source": "./plugins/daily-assistant"
     }
   ]

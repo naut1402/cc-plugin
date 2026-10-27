@@ -43,6 +43,8 @@ A section is **enabled** only when its required keys are non-empty. Callers chec
 | memory sync | `sync.source != none` (+ SilverBullet credentials for `silverbullet`, installed task-memory backend for `working-memory`) |
 | evolution | `evolution.enabled` (+ SilverBullet credentials for the page push and guides) |
 | watch log | `watch.enabled`, `node` on PATH (hooks) |
+| usage | `usage.enabled` not `false` (section optional); plan % needs the status line wrapper (`/usage setup`, Pro/Max plans) or a rate from another machine (`usage.per_pct`) |
+| human handover | always on (section optional); SilverBullet push needs `handover.silverbullet` + SilverBullet credentials |
 | watch checks | `watch.checks` non-empty |
 | archive files | inbox + destination resolvable (config `archive.*` or run-time `--inbox` / `--dest`) |
 | archive git | repos resolvable (config `archive.git.repos` or run-time `--repos`) |
@@ -66,6 +68,8 @@ Deterministic work runs in Node scripts, not in the model. The SessionStart hook
 | `DA schedule show\|install\|remove` | OS-level schedule for checks (no Claude session needed) |
 | `node ~/.daily-assistant/bin/memory-sync.mjs status\|plan\|apply\|commit` | Three-way compare / merge of memory, persona and config sections with the sync hub (`sync-memory`) |
 | `node ~/.daily-assistant/bin/evolution.mjs scan\|diff\|snapshot\|page` | Inventory of capabilities and learned memory, diff against the last snapshot, profile page render / push (`evolution`) |
+| `node ~/.daily-assistant/bin/usage.mjs status\|day\|rate\|budget\|spent\|task\|estimate\|commands\|facts\|setup` | Reading transcripts for tokens, calibrating tokens per 1% of plan usage, % ↔ token budgets, per-session / per-subagent spend, per-task history, shell-command stats, handover facts (`usage`, `human-handover`) |
+| `~/.daily-assistant/bin/statusline.mjs` (status line, not called by skills) | Sampling plan usage % on every status line refresh; queues the `usage-handover` reminder |
 
 Rules:
 

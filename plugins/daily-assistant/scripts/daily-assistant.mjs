@@ -437,7 +437,7 @@ async function schedule() {
     if (sub === 'install') {
       if (!t) { out(`skip ${c.id}: cron "${c.cron}" not convertible (fixed minute/hour, day-of-week only)`); continue; }
       const days = t.days.length === 7 ? null : t.days.map((d) => DOW[d].toUpperCase()).join(',');
-      const tr = `"${process.execPath}" "${script}" check ${c.id} --notify`;
+      const tr = `"${nodePath()}" "${script}" check ${c.id} --notify`;
       const a = ['/Create', '/F', '/TN', name(c.id), '/TR', tr, '/ST', `${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')}`, ...(days ? ['/SC', 'WEEKLY', '/D', days] : ['/SC', 'DAILY'])];
       if (!flags.yes) { out(`would run: schtasks ${a.map((x) => (/\s/.test(x) ? `'${x}'` : x)).join(' ')}`); continue; }
       try { execFileSync('schtasks', a, { stdio: 'ignore' }); out(`installed ${name(c.id)} at ${a[a.indexOf('/ST') + 1]}`); } catch (e) { out(`failed ${c.id}: ${e.message}`); }
@@ -449,11 +449,17 @@ async function schedule() {
   if (!flags.yes && sub !== 'show') out('(dry run — add --yes to apply)');
 }
 
-// Prefer the node found on PATH (version managers keep that shim stable); fall back to this process.
+// Node path for the OS scheduler, stable across version-manager upgrades. Version managers (proto…) put the
+// versioned tool dir first on PATH while running, so skip the running binary; also skip `shims` dirs — a shim
+// resolves the version from cwd and fails in the scheduler's cwd without a global pin. proto's `bin/node` is a
+// relinked real binary, so it qualifies. Fall back to this process (works, but pinned to the current version).
 function nodePath() {
   try {
-    const found = execFileSync(process.platform === 'win32' ? 'where' : 'which', ['node'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().split(/\r?\n/)[0].trim();
-    if (found) return found;
+    const self = process.execPath.toLowerCase();
+    const found = execFileSync(process.platform === 'win32' ? 'where' : 'which', process.platform === 'win32' ? ['node'] : ['-a', 'node'], { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const stable = found.find((p) => p.toLowerCase() !== self && !/[\\/]shims[\\/]/i.test(p));
+    if (stable) return stable;
   } catch { /* not on PATH */ }
   return process.execPath;
 }
